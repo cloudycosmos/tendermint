@@ -212,6 +212,7 @@ message ResponseCheckTx {
   repeated Event events     = 7
       [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
   string codespace = 8;
+  int32        sub_chain_id = 9 [(gogoproto.customname) = "SubChainID"];
 }
 
 message ResponseDeliverTx {
