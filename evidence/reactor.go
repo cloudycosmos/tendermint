@@ -28,14 +28,14 @@ const (
 // Reactor handles evpool evidence broadcasting amongst peers.
 type Reactor struct {
 	p2p.BaseReactor
-	evpool   *Pool
-	eventBus *types.EventBus
+	evpoolMap map[string]*Pool
+	eventBus  *types.EventBus
 }
 
 // NewReactor returns a new Reactor with the given config and evpool.
-func NewReactor(evpool *Pool) *Reactor {
+func NewReactor(evpoolMap map[string]*Pool) *Reactor {
 	evR := &Reactor{
-		evpool: evpool,
+		evpoolMap: evpoolMap,
 	}
 	evR.BaseReactor = *p2p.NewBaseReactor("Evidence", evR)
 	return evR
@@ -44,7 +44,9 @@ func NewReactor(evpool *Pool) *Reactor {
 // SetLogger sets the Logger on the reactor and the underlying Evidence.
 func (evR *Reactor) SetLogger(l log.Logger) {
 	evR.Logger = l
-	evR.evpool.SetLogger(l)
+	for _, evpool := range evR.evpoolMap {
+		evpool.SetLogger(l)
+	}
 }
 
 // GetChannels implements Reactor.
@@ -75,17 +77,19 @@ func (evR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	}
 
 	for _, ev := range evis {
-		err := evR.evpool.AddEvidence(ev)
-		switch err.(type) {
-		case *types.ErrInvalidEvidence:
-			evR.Logger.Error(err.Error())
-			// punish peer
-			evR.Switch.StopPeerForError(src, err)
-			return
-		case nil:
-		default:
-			// continue to the next piece of evidence
-			evR.Logger.Error("Evidence has not been added", "evidence", evis, "err", err)
+		if evpool, found := evR.evpoolMap["Need a real chainID"]; found {
+			err := evpool.AddEvidence(ev)
+			switch err.(type) {
+			case *types.ErrInvalidEvidence:
+				evR.Logger.Error(err.Error())
+				// punish peer
+				evR.Switch.StopPeerForError(src, err)
+				return
+			case nil:
+			default:
+				// continue to the next piece of evidence
+				evR.Logger.Error("Evidence has not been added", "evidence", evis, "err", err)
+			}
 		}
 	}
 }
@@ -102,6 +106,28 @@ func (evR *Reactor) SetEventBus(b *types.EventBus) {
 // - If we're waiting for new evidence and the list is not empty,
 // start iterating from the beginning again.
 func (evR *Reactor) broadcastEvidenceRoutine(peer p2p.Peer) {
+        var quitChans []chan<- struct{}
+        for _, evpool := range evR.evpoolMap {
+                quitChan := make(chan struct{})
+                quitChans = append(quitChans, quitChan)
+		go evR.broadcastEvidenceRoutineRaw(peer, evpool, quitChan)
+        }
+
+        select {
+        case <-peer.Quit():
+                for _, quitChan := range quitChans {
+                        quitChan <- struct{}{}
+                }
+                return
+        case <-evR.Quit():
+                for _, quitChan := range quitChans {
+                        quitChan <- struct{}{}
+                }
+                return
+        }
+}
+
+func (evR *Reactor) broadcastEvidenceRoutineRaw(peer p2p.Peer, evpool *Pool, quitChan <-chan struct{}) {
 	var next *clist.CElement
 	for {
 		// This happens because the CElement we were looking at got garbage
@@ -109,13 +135,11 @@ func (evR *Reactor) broadcastEvidenceRoutine(peer p2p.Peer) {
 		// start from the beginning.
 		if next == nil {
 			select {
-			case <-evR.evpool.EvidenceWaitChan(): // Wait until evidence is available
-				if next = evR.evpool.EvidenceFront(); next == nil {
+			case <-evpool.EvidenceWaitChan(): // Wait until evidence is available
+				if next = evpool.EvidenceFront(); next == nil {
 					continue
 				}
-			case <-peer.Quit():
-				return
-			case <-evR.Quit():
+			case <-quitChan:
 				return
 			}
 		} else if !peer.IsRunning() || !evR.IsRunning() {
@@ -146,9 +170,7 @@ func (evR *Reactor) broadcastEvidenceRoutine(peer p2p.Peer) {
 		case <-next.NextWaitChan():
 			// see the start of the for loop for nil check
 			next = next.Next()
-		case <-peer.Quit():
-			return
-		case <-evR.Quit():
+		case <-quitChan:
 			return
 		}
 	}
@@ -173,11 +195,13 @@ func (evR Reactor) prepareEvidenceMessage(
 		return nil
 	}
 
+	//TODI: get the real chainID from input parameter "ev"
+	evpool := evR.evpoolMap["Real chainID from ev"]
 	// NOTE: We only send evidence to peers where
 	// peerHeight - maxAge < evidenceHeight < peerHeight
 	var (
 		peerHeight   = peerState.GetHeight()
-		params       = evR.evpool.State().ConsensusParams.Evidence
+		params       = evpool.State().ConsensusParams.Evidence
 		ageNumBlocks = peerHeight - evHeight
 	)
 
@@ -191,7 +215,7 @@ func (evR Reactor) prepareEvidenceMessage(
 			"peerHeight", peerHeight,
 			"evHeight", evHeight,
 			"maxAgeNumBlocks", params.MaxAgeNumBlocks,
-			"lastBlockTime", evR.evpool.State().LastBlockTime,
+			"lastBlockTime", evpool.State().LastBlockTime,
 			"maxAgeDuration", params.MaxAgeDuration,
 			"peer", peer,
 		)

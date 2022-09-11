@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"github.com/tendermint/tendermint/types"
 )
 
 const (
@@ -35,9 +36,9 @@ var (
 	DefaultTendermintDir = ".tendermint"
 	defaultConfigDir     = "config"
 	defaultDataDir       = "data"
+        defaultGenesisDir    = "config/genesis"
 
 	defaultConfigFileName  = "config.toml"
-	defaultGenesisJSONName = "genesis.json"
 
 	defaultPrivValKeyName   = "priv_validator_key.json"
 	defaultPrivValStateName = "priv_validator_state.json"
@@ -46,7 +47,6 @@ var (
 	defaultAddrBookName = "addrbook.json"
 
 	defaultConfigFilePath   = filepath.Join(defaultConfigDir, defaultConfigFileName)
-	defaultGenesisJSONPath  = filepath.Join(defaultConfigDir, defaultGenesisJSONName)
 	defaultPrivValKeyPath   = filepath.Join(defaultConfigDir, defaultPrivValKeyName)
 	defaultPrivValStatePath = filepath.Join(defaultDataDir, defaultPrivValStateName)
 
@@ -197,8 +197,8 @@ type BaseConfig struct { //nolint: maligned
 	// Output format: 'plain' (colored text) or 'json'
 	LogFormat string `mapstructure:"log_format"`
 
-	// Path to the JSON file containing the initial validator set and other meta data
-	Genesis string `mapstructure:"genesis_file"`
+	// Directory to contain all the JSON genesis files which contain the initial validator set and other meta data per chain_id
+	GenesisDir string `mapstructure:"genesis_dir"`
 
 	// Path to the JSON file containing the private key to use as a validator in the consensus protocol
 	PrivValidatorKey string `mapstructure:"priv_validator_key_file"`
@@ -224,7 +224,7 @@ type BaseConfig struct { //nolint: maligned
 // DefaultBaseConfig returns a default base configuration for a Tendermint node
 func DefaultBaseConfig() BaseConfig {
 	return BaseConfig{
-		Genesis:            defaultGenesisJSONPath,
+		GenesisDir:         defaultGenesisDir,
 		PrivValidatorKey:   defaultPrivValKeyPath,
 		PrivValidatorState: defaultPrivValStatePath,
 		NodeKey:            defaultNodeKeyPath,
@@ -250,13 +250,47 @@ func TestBaseConfig() BaseConfig {
 	return cfg
 }
 
-func (cfg BaseConfig) ChainID() string {
-	return cfg.chainID
+//func (cfg BaseConfig) ChainID() string {
+//	return cfg.chainID
+//}
+
+func (cfg BaseConfig) GetAllChainIDs() ([]string, error) {
+	chainIDs := []string{}
+	genFiles := cfg.GenesisFiles()
+	for _, genFile := range genFiles {
+		genDoc, err := types.GenesisDocFromFile(genFile)
+		if err != nil {
+			return nil, err
+		} else {
+			chainID := genDoc.ChainID
+			if len(chainID) > 0 {
+				chainIDs = append(chainIDs, chainID)
+			}
+		}
+	}
+	if len(chainIDs) == 0 {
+		return nil, errors.New("there is no valid genesis files!")
+	}
+	return chainIDs, nil
 }
 
-// GenesisFile returns the full path to the genesis.json file
-func (cfg BaseConfig) GenesisFile() string {
-	return rootify(cfg.Genesis, cfg.RootDir)
+// GenesisFiles returns the list of full path to all the json genesis files
+func (cfg BaseConfig) GenesisFiles() []string {
+	genDir := rootify(cfg.GenesisDir, cfg.RootDir)
+	matches, err := filepath.Glob(genDir + "/*.json")
+	if err != nil {
+		panic(err)
+	}
+	if len(matches) == 0 {
+		panic("There must be at least 1 genesis file!")
+	}
+	return matches
+}
+
+// GenesisFile returns the full path to the json genesis file for chainID
+func (cfg BaseConfig) GenesisFile(chainID string) string {
+	genDir := rootify(cfg.GenesisDir, cfg.RootDir)
+	return(genDir + "/" + chainID + ".json")
 }
 
 // PrivValidatorKeyFile returns the full path to the priv_validator_key.json file
