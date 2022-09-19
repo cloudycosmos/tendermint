@@ -1,17 +1,17 @@
 package commands
 
 import (
-	"fmt"
+//	"fmt"
 
 	"github.com/spf13/cobra"
 
 	cfg "github.com/tendermint/tendermint/config"
 	tmos "github.com/tendermint/tendermint/libs/os"
-	tmrand "github.com/tendermint/tendermint/libs/rand"
+//	tmrand "github.com/tendermint/tendermint/libs/rand"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
-	"github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
+//	"github.com/tendermint/tendermint/types"
+//	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 // InitFilesCmd initialises a fresh Tendermint Core instance.
@@ -51,31 +51,34 @@ func initFilesWithConfig(config *cfg.Config) error {
 		logger.Info("Generated node key", "path", nodeKeyFile)
 	}
 
-	// genesis file
-	genFile := config.GenesisFile()
-	if tmos.FileExists(genFile) {
-		logger.Info("Found genesis file", "path", genFile)
-	} else {
-		genDoc := types.GenesisDoc{
-			ChainID:         fmt.Sprintf("test-chain-%v", tmrand.Str(6)),
-			GenesisTime:     tmtime.Now(),
-			ConsensusParams: types.DefaultConsensusParams(),
-		}
-		pubKey, err := pv.GetPubKey()
-		if err != nil {
-			return fmt.Errorf("can't get pubkey: %w", err)
-		}
-		genDoc.Validators = []types.GenesisValidator{{
-			Address: pubKey.Address(),
-			PubKey:  pubKey,
-			Power:   10,
-		}}
-
-		if err := genDoc.SaveAs(genFile); err != nil {
-			return err
-		}
-		logger.Info("Generated genesis file", "path", genFile)
-	}
+// YITODO: commenting the fllowing line may cause tests fail. but in production this is not needed
+//         we can handle this latter
+//
+//	// genesis file
+//	genFile := config.GenesisFile()
+//	if tmos.FileExists(genFile) {
+//		logger.Info("Found genesis file", "path", genFile)
+//	} else {
+//		genDoc := types.GenesisDoc{
+//			ChainID:         fmt.Sprintf("test-chain-%v", tmrand.Str(6)),
+//			GenesisTime:     tmtime.Now(),
+//			ConsensusParams: types.DefaultConsensusParams(),
+//		}
+//		pubKey, err := pv.GetPubKey()
+//		if err != nil {
+//			return fmt.Errorf("can't get pubkey: %w", err)
+//		}
+//		genDoc.Validators = []types.GenesisValidator{{
+//			Address: pubKey.Address(),
+//			PubKey:  pubKey,
+//			Power:   10,
+//		}}
+//
+//		if err := genDoc.SaveAs(genFile); err != nil {
+//			return err
+//		}
+//		logger.Info("Generated genesis file", "path", genFile)
+//	}
 
 	return nil
 }

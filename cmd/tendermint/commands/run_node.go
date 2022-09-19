@@ -32,11 +32,14 @@ func AddNodeFlags(cmd *cobra.Command) {
 
 	// node flags
 	cmd.Flags().Bool("fast_sync", config.FastSyncMode, "fast blockchain syncing")
-	cmd.Flags().BytesHexVar(
-		&genesisHash,
-		"genesis_hash",
-		[]byte{},
-		"optional SHA-256 hash of the genesis file")
+
+// YITODO: the flag genesis_hash is not suitable for Multi-Chain 
+//	cmd.Flags().BytesHexVar(
+//		&genesisHash,
+//		"genesis_hash",
+//		[]byte{},
+//		"optional SHA-256 hash of the genesis file")
+
 	cmd.Flags().Int64("consensus.double_sign_check_height", config.Consensus.DoubleSignCheckHeight,
 		"how many blocks to look back to check existence of the node's "+
 			"consensus votes before joining consensus")
@@ -135,12 +138,12 @@ func NewRunNodeCmd(nodeProvider nm.Provider) *cobra.Command {
 }
 
 func checkGenesisHash(config *cfg.Config) error {
-	if len(genesisHash) == 0 || config.Genesis == "" {
+	if len(genesisHash) == 0 || config.GenesisDir == "" {
 		return nil
 	}
 
 	// Calculate SHA-256 hash of the genesis file.
-	f, err := os.Open(config.GenesisFile())
+	f, err := os.Open(config.GenesisFile(chainID))
 	if err != nil {
 		return fmt.Errorf("can't open genesis file: %w", err)
 	}
@@ -155,7 +158,7 @@ func checkGenesisHash(config *cfg.Config) error {
 	if !bytes.Equal(genesisHash, actualHash) {
 		return fmt.Errorf(
 			"--genesis_hash=%X does not match %s hash: %X",
-			genesisHash, config.GenesisFile(), actualHash)
+			genesisHash, config.GenesisFile("just-make-compiling-happy"), actualHash)  // YITODO: this function won't be called
 	}
 
 	return nil

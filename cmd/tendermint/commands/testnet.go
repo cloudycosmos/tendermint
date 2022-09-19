@@ -16,7 +16,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
+//	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 var (
@@ -177,23 +177,24 @@ func testnetFiles(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Generate genesis doc from generated validators
-	genDoc := &types.GenesisDoc{
-		ChainID:         "chain-" + tmrand.Str(6),
-		ConsensusParams: types.DefaultConsensusParams(),
-		GenesisTime:     tmtime.Now(),
-		InitialHeight:   initialHeight,
-		Validators:      genVals,
-	}
-
-	// Write genesis file.
-	for i := 0; i < nValidators+nNonValidators; i++ {
-		nodeDir := filepath.Join(outputDir, fmt.Sprintf("%s%d", nodeDirPrefix, i))
-		if err := genDoc.SaveAs(filepath.Join(nodeDir, config.BaseConfig.Genesis)); err != nil {
-			_ = os.RemoveAll(outputDir)
-			return err
-		}
-	}
+// YITODO: this can be handled later
+//	// Generate genesis doc from generated validators
+//	genDoc := &types.GenesisDoc{
+//		ChainID:         "chain-" + tmrand.Str(6),
+//		ConsensusParams: types.DefaultConsensusParams(),
+//		GenesisTime:     tmtime.Now(),
+//		InitialHeight:   initialHeight,
+//		Validators:      genVals,
+//	}
+//
+//	// Write genesis file.
+//	for i := 0; i < nValidators+nNonValidators; i++ {
+//		nodeDir := filepath.Join(outputDir, fmt.Sprintf("%s%d", nodeDirPrefix, i))
+//		if err := genDoc.SaveAs(filepath.Join(nodeDir, config.BaseConfig.Genesis)); err != nil {
+//			_ = os.RemoveAll(outputDir)
+//			return err
+//		}
+//	}
 
 	// Gather persistent peer addresses.
 	var (
