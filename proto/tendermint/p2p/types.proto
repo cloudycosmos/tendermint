@@ -30,6 +30,6 @@ message DefaultNodeInfo {
 }
 
 message DefaultNodeInfoOther {
-  string tx_index    = 1;
+  map<string, string> tx_indexMap = 1;
   string rpc_address = 2 [(gogoproto.customname) = "RPCAddress"];
 }
