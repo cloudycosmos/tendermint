@@ -72,6 +72,7 @@ message RequestQuery {
   string path   = 2;
   int64  height = 3;
   bool   prove  = 4;
+  string chain_id = 5 [(gogoproto.customname) = "ChainID"];
 }
 
 message RequestBeginBlock {
@@ -79,6 +80,7 @@ message RequestBeginBlock {
   tendermint.types.Header header               = 2 [(gogoproto.nullable) = false];
   LastCommitInfo          last_commit_info     = 3 [(gogoproto.nullable) = false];
   repeated Evidence       byzantine_validators = 4 [(gogoproto.nullable) = false];
+  string                  chain_id             = 5 [(gogoproto.customname) = "ChainID"];
 }
 
 enum CheckTxType {
@@ -89,26 +91,33 @@ enum CheckTxType {
 message RequestCheckTx {
   bytes       tx   = 1;
   CheckTxType type = 2;
+  string      chain_id = 3 [(gogoproto.customname) = "ChainID"];
 }
 
 message RequestDeliverTx {
   bytes tx = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
 message RequestEndBlock {
   int64 height = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
-message RequestCommit {}
+message RequestCommit {
+  string chain_id = 1 [(gogoproto.customname) = "ChainID"];
+}
 
 // lists available snapshots
 message RequestListSnapshots {
+  string chain_id = 1 [(gogoproto.customname) = "ChainID"];
 }
 
 // offers a snapshot to the application
 message RequestOfferSnapshot {
   Snapshot snapshot = 1;  // snapshot offered by peers
   bytes    app_hash = 2;  // light client-verified app hash for snapshot height
+  string   chain_id = 3 [(gogoproto.customname) = "ChainID"];
 }
 
 // loads a snapshot chunk
@@ -116,6 +125,7 @@ message RequestLoadSnapshotChunk {
   uint64 height = 1;
   uint32 format = 2;
   uint32 chunk  = 3;
+  string chain_id = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 // Applies a snapshot chunk
@@ -123,6 +133,7 @@ message RequestApplySnapshotChunk {
   uint32 index  = 1;
   bytes  chunk  = 2;
   string sender = 3;
+  string chain_id = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 //----------------------------------------
