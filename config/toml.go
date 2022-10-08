@@ -125,7 +125,7 @@ log_format = "{{ .BaseConfig.LogFormat }}"
 ##### additional base config options #####
 
 # Path to the JSON file containing the initial validator set and other meta data
-genesis_file = "{{ js .BaseConfig.Genesis }}"
+genesis_dir = "{{ js .BaseConfig.GenesisDir }}"
 
 # Path to the JSON file containing the private key to use as a validator in the consensus protocol
 priv_validator_key_file = "{{ js .BaseConfig.PrivValidatorKey }}"

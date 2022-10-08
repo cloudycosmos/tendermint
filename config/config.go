@@ -290,6 +290,10 @@ func (cfg BaseConfig) GenesisFiles() []string {
 // GenesisFile returns the full path to the json genesis file for chainID
 func (cfg BaseConfig) GenesisFile(chainID string) string {
 	genDir := rootify(cfg.GenesisDir, cfg.RootDir)
+	err := os.MkdirAll(genDir, os.ModePerm)
+	if err != nil {
+		panic("Failed to create directory for genesis files!")
+	}
 	return(genDir + "/" + chainID + ".json")
 }
 
