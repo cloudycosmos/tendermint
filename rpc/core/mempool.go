@@ -66,9 +66,14 @@ func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadc
 	chainID := "get chain ID from tx through abci"   // YITODO: get chainID from tx 
 	subscriber := ctx.RemoteAddr()
 
-	if env.EventBus.NumClients() >= env.Config.MaxSubscriptionClients {
+        eventBus, found := env.EventBusMap[chainID]
+        if !found {
+                return nil, errors.New("failed to get eventBus")
+        }
+
+	if eventBus.NumClients() >= env.Config.MaxSubscriptionClients {
 		return nil, fmt.Errorf("max_subscription_clients %d reached", env.Config.MaxSubscriptionClients)
-	} else if env.EventBus.NumClientSubscriptions(subscriber) >= env.Config.MaxSubscriptionsPerClient {
+	} else if eventBus.NumClientSubscriptions(subscriber) >= env.Config.MaxSubscriptionsPerClient {
 		return nil, fmt.Errorf("max_subscriptions_per_client %d reached", env.Config.MaxSubscriptionsPerClient)
 	}
 
@@ -76,14 +81,16 @@ func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadc
 	subCtx, cancel := context.WithTimeout(ctx.Context(), SubscribeTimeout)
 	defer cancel()
 	q := types.EventQueryTxFor(tx)
-	deliverTxSub, err := env.EventBus.Subscribe(subCtx, subscriber, q)
+
+
+	deliverTxSub, err := eventBus.Subscribe(subCtx, subscriber, q)
 	if err != nil {
 		err = fmt.Errorf("failed to subscribe to tx: %w", err)
 		env.Logger.Error("Error on broadcast_tx_commit", "err", err)
 		return nil, err
 	}
 	defer func() {
-		if err := env.EventBus.Unsubscribe(context.Background(), subscriber, q); err != nil {
+		if err := eventBus.Unsubscribe(context.Background(), subscriber, q); err != nil {
 			env.Logger.Error("Error unsubscribing from eventBus", "err", err)
 		}
 	}()
@@ -169,8 +176,14 @@ func NumUnconfirmedTxs(ctx *rpctypes.Context, chainID string) (*ctypes.ResultUnc
 // CheckTx checks the transaction without executing it. The transaction won't
 // be added to the mempool either.
 // More: https://docs.tendermint.com/master/rpc/#/Tx/check_tx
-func CheckTx(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
-	res, err := env.ProxyAppMempool.CheckTxSync(abci.RequestCheckTx{Tx: tx})
+func CheckTx(ctx *rpctypes.Context, chainID string, tx types.Tx) (*ctypes.ResultCheckTx, error) {
+	proxyApp, found := env.ProxyAppMap[chainID]
+	if !found {
+		return nil, errors.New("failed to get proxyApp")
+	}
+	proxyAppMempool := proxyApp.Mempool()
+
+	res, err := proxyAppMempool.CheckTxSync(abci.RequestCheckTx{Tx: tx})
 	if err != nil {
 		return nil, err
 	}

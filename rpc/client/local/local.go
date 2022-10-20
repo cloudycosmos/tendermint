@@ -41,6 +41,8 @@ type Local struct {
 	*types.EventBus
 	Logger log.Logger
 	ctx    *rpctypes.Context
+	Node   *nm.Node          // Added by Yi. Then we can switch the EventBus for each chainID on the fly
+	ChainID string           // Added by Yi. Then we can indicate which chainID we're working on
 }
 
 // NewLocal configures a client that calls the Node directly.
@@ -54,13 +56,27 @@ func New(node *nm.Node) *Local {
 		node.Logger.Error("Error configuring RPC", "err", err)
 	}
 	return &Local{
-		EventBus: node.EventBus(),
+		EventBus: nil,
 		Logger:   log.NewNopLogger(),
 		ctx:      &rpctypes.Context{},
+		Node:     node,
 	}
 }
 
 var _ rpcclient.Client = (*Local)(nil)
+
+// Added by Yi
+func (c *Local) SetChainID(chainID string) error {
+	allChainIDs := c.Node.AllChainIDs()
+	for _, aChainID := range allChainIDs {
+		if chainID == aChainID {
+			c.ChainID = chainID
+			c.EventBus = c.Node.EventBusMap()[chainID]
+			return nil
+		}
+	}
+	return fmt.Errorf("Wrong chainID")
+}
 
 // SetLogger allows to set a logger on the client.
 func (c *Local) SetLogger(l log.Logger) {
@@ -72,7 +88,7 @@ func (c *Local) Status(ctx context.Context, chainID string) (*ctypes.ResultStatu
 }
 
 func (c *Local) ABCIInfo(ctx context.Context) (*ctypes.ResultABCIInfo, error) {
-	return core.ABCIInfo(c.ctx)
+	return core.ABCIInfo(c.ctx, c.ChainID)
 }
 
 func (c *Local) ABCIQuery(ctx context.Context, chainId, path string, data bytes.HexBytes) (*ctypes.ResultABCIQuery, error) {
@@ -109,7 +125,7 @@ func (c *Local) NumUnconfirmedTxs(ctx context.Context, chainID string) (*ctypes.
 }
 
 func (c *Local) CheckTx(ctx context.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
-	return core.CheckTx(c.ctx, tx)
+	return core.CheckTx(c.ctx, c.ChainID, tx)
 }
 
 func (c *Local) NetInfo(ctx context.Context) (*ctypes.ResultNetInfo, error) {

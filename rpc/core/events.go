@@ -17,9 +17,14 @@ import (
 func Subscribe(ctx *rpctypes.Context, query string) (*ctypes.ResultSubscribe, error) {
 	addr := ctx.RemoteAddr()
 
-	if env.EventBus.NumClients() >= env.Config.MaxSubscriptionClients {
+	chainID := "ethdbchain_9000-1"  //YITODO: Need a better way to get chainID
+	eventBus, found := env.EventBusMap[chainID]
+	if !found {
+		return nil, errors.New("failed to get eventBus")
+	}
+	if eventBus.NumClients() >= env.Config.MaxSubscriptionClients {
 		return nil, fmt.Errorf("max_subscription_clients %d reached", env.Config.MaxSubscriptionClients)
-	} else if env.EventBus.NumClientSubscriptions(addr) >= env.Config.MaxSubscriptionsPerClient {
+	} else if eventBus.NumClientSubscriptions(addr) >= env.Config.MaxSubscriptionsPerClient {
 		return nil, fmt.Errorf("max_subscriptions_per_client %d reached", env.Config.MaxSubscriptionsPerClient)
 	}
 
@@ -33,7 +38,7 @@ func Subscribe(ctx *rpctypes.Context, query string) (*ctypes.ResultSubscribe, er
 	subCtx, cancel := context.WithTimeout(ctx.Context(), SubscribeTimeout)
 	defer cancel()
 
-	sub, err := env.EventBus.Subscribe(subCtx, addr, q, env.Config.SubscriptionBufferSize)
+	sub, err := eventBus.Subscribe(subCtx, addr, q, env.Config.SubscriptionBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +107,14 @@ func Unsubscribe(ctx *rpctypes.Context, query string) (*ctypes.ResultUnsubscribe
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse query: %w", err)
 	}
-	err = env.EventBus.Unsubscribe(context.Background(), addr, q)
+
+	chainID := "ethdbchain_9000-1"  //YITODO: Need a better way to get chainID
+	eventBus, found := env.EventBusMap[chainID]
+	if !found {
+		return nil, errors.New("failed to get eventBus")
+	}
+
+	err = eventBus.Unsubscribe(context.Background(), addr, q)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +126,14 @@ func Unsubscribe(ctx *rpctypes.Context, query string) (*ctypes.ResultUnsubscribe
 func UnsubscribeAll(ctx *rpctypes.Context) (*ctypes.ResultUnsubscribe, error) {
 	addr := ctx.RemoteAddr()
 	env.Logger.Info("Unsubscribe from all", "remote", addr)
-	err := env.EventBus.UnsubscribeAll(context.Background(), addr)
+
+	chainID := "ethdbchain_9000-1"  //YITODO: Need a better way to get chainID
+	eventBus, found := env.EventBusMap[chainID]
+	if !found {
+		return nil, errors.New("failed to get eventBus")
+	}
+
+	err := eventBus.UnsubscribeAll(context.Background(), addr)
 	if err != nil {
 		return nil, err
 	}

@@ -74,8 +74,9 @@ type peers interface {
 // to be setup once during startup.
 type Environment struct {
 	// external, thread safe interfaces
-	ProxyAppQuery   proxy.AppConnQuery
-	ProxyAppMempool proxy.AppConnMempool
+	//ProxyAppQuery   proxy.AppConnQuery
+	//ProxyAppMempool proxy.AppConnMempool
+	ProxyAppMap       map[string]proxy.AppConns
 
 	// interfaces defined in types and above
 	StateStoreMap     map[string]sm.Store
@@ -91,7 +92,7 @@ type Environment struct {
 	TxIndexerMap     map[string]txindex.TxIndexer
 	BlockIndexerMap  map[string]indexer.BlockIndexer
 	ConsensusReactor *consensus.Reactor
-	EventBus         *types.EventBus // thread safe
+	EventBusMap      map[string]*types.EventBus // thread safe
 	MempoolMap       map[string]mempl.Mempool
 
 	Logger log.Logger

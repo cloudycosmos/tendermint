@@ -30,8 +30,9 @@ type Reactor struct {
 	p2p.BaseReactor
 
 	cfg       config.StateSyncConfig
-	conn      proxy.AppConnSnapshot
-	connQuery proxy.AppConnQuery
+	//conn      proxy.AppConnSnapshot
+	//connQuery proxy.AppConnQuery
+	proxyAppMap map[string]proxy.AppConns
 	tempDir   string
 
 	// This will only be set when a state sync is in progress. It is used to feed received
@@ -43,15 +44,17 @@ type Reactor struct {
 // NewReactor creates a new state sync reactor.
 func NewReactor(
 	cfg config.StateSyncConfig,
-	conn proxy.AppConnSnapshot,
-	connQuery proxy.AppConnQuery,
+	//conn proxy.AppConnSnapshot,
+	//connQuery proxy.AppConnQuery,
+	proxyAppMap map[string]proxy.AppConns,
 	tempDir string,
 ) *Reactor {
 
 	r := &Reactor{
 		cfg:       cfg,
-		conn:      conn,
-		connQuery: connQuery,
+		//conn:      conn,
+		//connQuery: connQuery,
+		proxyAppMap: proxyAppMap,
 	}
 	r.BaseReactor = *p2p.NewBaseReactor("StateSync", r)
 
@@ -122,7 +125,9 @@ func (r *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	case SnapshotChannel:
 		switch msg := msg.(type) {
 		case *ssproto.SnapshotsRequest:
-			snapshots, err := r.recentSnapshots(recentSnapshots)
+			// Added by Yi
+			chainID := msg.GetChainID()
+			snapshots, err := r.recentSnapshots(recentSnapshots, chainID)
 			if err != nil {
 				r.Logger.Error("Failed to fetch snapshots", "err", err)
 				return
@@ -168,9 +173,17 @@ func (r *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	case ChunkChannel:
 		switch msg := msg.(type) {
 		case *ssproto.ChunkRequest:
+			// Added by Yi
+			chainID := msg.GetChainID()
+			proxyApp, found := r.proxyAppMap[chainID]
+			if !found {
+				return
+			}
+                        conn := proxyApp.Snapshot()
+
 			r.Logger.Debug("Received chunk request", "height", msg.Height, "format", msg.Format,
 				"chunk", msg.Index, "peer", src.ID())
-			resp, err := r.conn.LoadSnapshotChunkSync(abci.RequestLoadSnapshotChunk{
+			resp, err := conn.LoadSnapshotChunkSync(abci.RequestLoadSnapshotChunk{
 				Height: msg.Height,
 				Format: msg.Format,
 				Chunk:  msg.Index,
@@ -222,8 +235,13 @@ func (r *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 }
 
 // recentSnapshots fetches the n most recent snapshots from the app
-func (r *Reactor) recentSnapshots(n uint32) ([]*snapshot, error) {
-	resp, err := r.conn.ListSnapshotsSync(abci.RequestListSnapshots{})
+func (r *Reactor) recentSnapshots(n uint32, chainID string) ([]*snapshot, error) {
+	proxyApp, found := r.proxyAppMap[chainID]
+	if !found {
+		return nil, errors.New("failed to get proxyApp")
+	}
+        conn := proxyApp.Snapshot()
+	resp, err := conn.ListSnapshotsSync(abci.RequestListSnapshots{})
 	if err != nil {
 		return nil, err
 	}
@@ -257,13 +275,19 @@ func (r *Reactor) recentSnapshots(n uint32) ([]*snapshot, error) {
 
 // Sync runs a state sync, returning the new state and last commit at the snapshot height.
 // The caller must store the state and commit in the state database and block store.
-func (r *Reactor) Sync(stateProvider StateProvider, discoveryTime time.Duration) (sm.State, *types.Commit, error) {
+func (r *Reactor) Sync(stateProvider StateProvider, discoveryTime time.Duration, chainID string) (sm.State, *types.Commit, error) {
 	r.mtx.Lock()
 	if r.syncer != nil {
 		r.mtx.Unlock()
 		return sm.State{}, nil, errors.New("a state sync is already in progress")
 	}
-	r.syncer = newSyncer(r.cfg, r.Logger, r.conn, r.connQuery, stateProvider, r.tempDir)
+	proxyApp, found := r.proxyAppMap[chainID]
+	if !found {
+		return  sm.State{}, nil, errors.New("failed to get proxyApp")
+	}
+	conn := proxyApp.Snapshot()
+	connQuery := proxyApp.Query()
+	r.syncer = newSyncer(r.cfg, r.Logger, conn, connQuery, stateProvider, r.tempDir)
 	r.mtx.Unlock()
 
 	hook := func() {

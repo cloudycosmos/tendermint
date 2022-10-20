@@ -55,7 +55,8 @@ func BlockExecutorWithMetrics(metrics *Metrics) BlockExecutorOption {
 func NewBlockExecutor(
 	stateStoreMap map[string]Store,
 	logger log.Logger,
-	proxyApp proxy.AppConnConsensus,
+	//proxyApp proxy.AppConnConsensus,
+	proxyAppMap map[string]proxy.AppConns,
 	mempoolMap map[string]*mempl.CListMempool,
 	evpoolMap map[string]EvidencePool,
 	options ...BlockExecutorOption,
@@ -71,10 +72,15 @@ func NewBlockExecutor(
 			return map[string]*BlockExecutor{}
 		}
 
+		proxyApp, found := proxyAppMap[chainID]
+		if ! found {
+			return map[string]*BlockExecutor{}
+		}
+
 		res := NewBlockExecutorRaw(
 			stateStore,
 			logger,
-			proxyApp,
+			proxyApp.Consensus(),
 			mempool,
 			evpool,
 			options...

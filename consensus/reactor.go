@@ -45,7 +45,7 @@ type Reactor struct {
 
 	mtx         tmsync.RWMutex
 	waitSyncMap map[string]bool
-	eventBus    *types.EventBus
+	eventBusMap map[string]*types.EventBus
 	rsMap       map[string]*cstypes.RoundState
 
 	Metrics *Metrics
@@ -403,11 +403,13 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 }
 
 // SetEventBus sets event bus.
-func (conR *Reactor) SetEventBus(b *types.EventBus) {
-	conR.eventBus = b
+func (conR *Reactor) SetEventBus(m map[string]*types.EventBus) {
+	conR.eventBusMap = m
 
-	for _, conS := range conR.conSMap {
-		conS.SetEventBus(b)
+	for chainID, conS := range conR.conSMap {
+		if b, found := m[chainID]; found {
+			conS.SetEventBus(b)
+		} // the else won't happen
 	}
 }
 

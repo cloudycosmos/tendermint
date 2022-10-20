@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/proxy"
@@ -18,7 +19,12 @@ func ABCIQuery(
 	height int64,
 	prove bool,
 ) (*ctypes.ResultABCIQuery, error) {
-	resQuery, err := env.ProxyAppQuery.QuerySync(abci.RequestQuery{
+	proxyApp, found := env.ProxyAppMap[chainId]
+	if !found {
+		return nil, errors.New("failed to get proxyApp")
+	}
+	proxyAppQuery := proxyApp.Query()
+	resQuery, err := proxyAppQuery.QuerySync(abci.RequestQuery{
 		Path:   path,
 		Data:   data,
 		Height: height,
@@ -34,8 +40,13 @@ func ABCIQuery(
 
 // ABCIInfo gets some info about the application.
 // More: https://docs.tendermint.com/master/rpc/#/ABCI/abci_info
-func ABCIInfo(ctx *rpctypes.Context) (*ctypes.ResultABCIInfo, error) {
-	resInfo, err := env.ProxyAppQuery.InfoSync(proxy.RequestInfo)
+func ABCIInfo(ctx *rpctypes.Context, chainId string) (*ctypes.ResultABCIInfo, error) {
+	proxyApp, found := env.ProxyAppMap[chainId]
+	if !found {
+		return nil, errors.New("failed to get proxyApp")
+	}
+	proxyAppQuery := proxyApp.Query()
+	resInfo, err := proxyAppQuery.InfoSync(proxy.RequestInfo)
 	if err != nil {
 		return nil, err
 	}

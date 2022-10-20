@@ -206,7 +206,7 @@ type Node struct {
 	isListening bool
 
 	// services
-	eventBus          *types.EventBus              // pub/sub for services
+	eventBusMap       map[string]*types.EventBus   // pub/sub for services
 	stateStoreMap     map[string]sm.Store
 	blockStoreMap     map[string]*store.BlockStore // store the blockchain to disk
 	bcReactor         p2p.Reactor                  // for fast-syncing
@@ -220,7 +220,7 @@ type Node struct {
 	consensusReactor  *cs.Reactor                  // for participating in the consensus
 	pexReactor        *pex.Reactor                 // for exchanging peer addresses
 	evidencePoolMap   map[string]*evidence.Pool    // tracking evidence
-	proxyApp          proxy.AppConns               // connection to the application
+	proxyAppMap       map[string]proxy.AppConns    // connection to the application
 	rpcListeners      []net.Listener               // rpc servers
 	txIndexerMap      map[string]txindex.TxIndexer
 	blockIndexerMap   map[string]indexer.BlockIndexer
@@ -285,7 +285,20 @@ func createAndStartProxyAppConns(clientCreator proxy.ClientCreator, logger log.L
 	return proxyApp, nil
 }
 
-func createAndStartEventBus(logger log.Logger) (*types.EventBus, error) {
+func createAndStartEventBus(allChainIDs []string, logger log.Logger) (map[string]*types.EventBus, error) {
+	eventBusMap := make(map[string]*types.EventBus)
+	var err error
+	for _, chainID := range allChainIDs {
+		eventBus, err := createAndStartEventBusRaw(logger)
+		if err != nil {
+			return eventBusMap, err
+		}
+		eventBusMap[chainID] = eventBus
+	}
+	return eventBusMap, err
+}
+
+func createAndStartEventBusRaw(logger log.Logger) (*types.EventBus, error) {
 	eventBus := types.NewEventBus()
 	eventBus.SetLogger(logger.With("module", "events"))
 	if err := eventBus.Start(); err != nil {
@@ -294,21 +307,27 @@ func createAndStartEventBus(logger log.Logger) (*types.EventBus, error) {
 	return eventBus, nil
 }
 
-
 func createAndStartIndexerService(
 	config *cfg.Config,
 	chainIDs []string,
 	dbProvider DBProvider,
-	eventBus *types.EventBus,
+	eventBusMap map[string]*types.EventBus,
 	logger log.Logger,
 ) (map[string]*txindex.IndexerService, map[string]txindex.TxIndexer, map[string]indexer.BlockIndexer, error) {
 	indexerServiceMap := make(map[string]*txindex.IndexerService)
 	txIndexerMap      := make(map[string]txindex.TxIndexer)
 	blockIndexerMap   := make(map[string]indexer.BlockIndexer)
 
+	var dbHolder dbm.DB
 	for _, chainID := range(chainIDs) {
+		eventBus, found := eventBusMap[chainID]
+		if !found {
+			err := errors.New("failed to get eventbus")
+			return indexerServiceMap, txIndexerMap, blockIndexerMap, err
+		}
+
 		indexerService, txIndexer, blockIndexer, err := createAndStartIndexerServiceRaw(config,
-			chainID, dbProvider, eventBus, logger)
+			chainID, dbProvider, eventBus, logger, &dbHolder)
 		if err != nil {
 			return indexerServiceMap, txIndexerMap, blockIndexerMap, err
 		}
@@ -326,6 +345,7 @@ func createAndStartIndexerServiceRaw(
 	dbProvider DBProvider,
 	eventBus *types.EventBus,
 	logger log.Logger,
+	dbHolder *dbm.DB,
 ) (*txindex.IndexerService, txindex.TxIndexer, indexer.BlockIndexer, error) {
 
 	var (
@@ -335,11 +355,14 @@ func createAndStartIndexerServiceRaw(
 
 	switch config.TxIndex.Indexer {
 	case "kv":
-		store, err := dbProvider(&DBContext{"tx_index", config})
-		if err != nil {
-			return nil, nil, nil, err
+		if dbHolder == nil {
+			db, err := dbProvider(&DBContext{"tx_index", config})
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			dbHolder = &db
 		}
-		store = dbm.NewPrefixDB(store, []byte(chainID))
+		store := dbm.NewPrefixDB(*dbHolder, []byte(chainID))
 
 		txIndexer = kv.NewTxIndex(store)
 		blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
@@ -411,11 +434,15 @@ func onlyValidatorIsUs(state sm.State, pubKey crypto.PubKey) bool {
 	return bytes.Equal(pubKey.Address(), addr)
 }
 
-func createMempoolAndMempoolReactor(config *cfg.Config, proxyApp proxy.AppConns,
+func createMempoolAndMempoolReactor(config *cfg.Config, proxyAppMap map[string]proxy.AppConns,
 	stateMap map[string]sm.State, memplMetrics *mempl.Metrics, logger log.Logger) (*mempl.Reactor, map[string]*mempl.CListMempool) {
 
 	mempoolMap := make(map[string]*mempl.CListMempool)
 	for chainID, state := range stateMap {
+		proxyApp, found := proxyAppMap[chainID]
+		if !found {
+			return  nil, nil
+		}
 		mempool := mempl.NewCListMempool(
 			config.Mempool,
 			proxyApp.Mempool(),
@@ -501,7 +528,7 @@ func createConsensusReactor(config *cfg.Config,
 	privValidator types.PrivValidator,
 	csMetrics *cs.Metrics,
 	waitSyncMap map[string]bool,
-	eventBus *types.EventBus,
+	eventBusMap map[string]*types.EventBus,
 	consensusLogger log.Logger) (*cs.Reactor, map[string]*cs.State) {
 
 	consensusStateMap := make(map[string]*cs.State)
@@ -539,7 +566,7 @@ func createConsensusReactor(config *cfg.Config,
 	consensusReactor.SetLogger(consensusLogger)
 	// services which will be publishing and/or subscribing for messages (events)
 	// consensusReactor will set it on consensusState and blockExecutor
-	consensusReactor.SetEventBus(eventBus)
+	consensusReactor.SetEventBus(eventBusMap)
 	return consensusReactor, consensusStateMap
 }
 
@@ -728,7 +755,7 @@ func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reacto
 	}
 
 	go func() {
-		state, commit, err := ssR.Sync(stateProvider, config.DiscoveryTime)
+		state, commit, err := ssR.Sync(stateProvider, config.DiscoveryTime, chainID)
 		if err != nil {
 			ssR.Logger.Error("State sync failed", "err", err)
 			return
@@ -795,22 +822,26 @@ func NewNode(config *cfg.Config,
 	}
 
 	// Create the proxyApp and establish connections to the ABCI app (consensus, mempool, query).
-	proxyApp, err := createAndStartProxyAppConns(clientCreator, logger)
-	if err != nil {
-		return nil, err
+	proxyAppMap := make(map[string]proxy.AppConns, len(allChainIDs))
+	for _, chainID := range(allChainIDs) {
+		proxyApp, err := createAndStartProxyAppConns(clientCreator, logger)
+		if err != nil {
+			return nil, err
+		}
+		proxyAppMap[chainID] = proxyApp
 	}
 
 	// EventBus and IndexerService must be started before the handshake because
 	// we might need to index the txs of the replayed block as this might not have happened
 	// when the node stopped last time (i.e. the node stopped after it saved the block
 	// but before it indexed the txs, or, endblocker panicked)
-	eventBus, err := createAndStartEventBus(logger)
+	eventBusMap, err := createAndStartEventBus(allChainIDs, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	indexerServiceMap, txIndexerMap, blockIndexerMap, err := createAndStartIndexerService(config,
-		allChainIDs, dbProvider, eventBus, logger)
+		allChainIDs, dbProvider, eventBusMap, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -859,6 +890,15 @@ func NewNode(config *cfg.Config,
 			return nil, errors.New("failed to get genDoc!")
 		}
 
+		eventBus, found := eventBusMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get eventBus!")
+		}
+
+		proxyApp, found := proxyAppMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get proxyApp!")
+		}
 
 		// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 		// and replays any blocks as necessary to sync tendermint with the app.
@@ -884,7 +924,7 @@ func NewNode(config *cfg.Config,
 	csMetrics, p2pMetrics, memplMetrics, smMetrics := metricsProvider("fake-chain-id")
 
 	// Make MempoolReactor
-	mempoolReactor, mempoolMap := createMempoolAndMempoolReactor(config, proxyApp, stateMap, memplMetrics, logger)
+	mempoolReactor, mempoolMap := createMempoolAndMempoolReactor(config, proxyAppMap, stateMap, memplMetrics, logger)
 
 
 	// Make Evidence Reactor
@@ -902,7 +942,7 @@ func NewNode(config *cfg.Config,
 	blockExecMap := sm.NewBlockExecutor(
 		stateStoreMap,
 		logger.With("module", "state"),
-		proxyApp.Consensus(),
+		proxyAppMap,
 		mempoolMap,
 		evidencePoolInterfaceMap,
 		sm.BlockExecutorWithMetrics(smMetrics),
@@ -952,7 +992,7 @@ func NewNode(config *cfg.Config,
 	}
 	consensusReactor, consensusStateMap := createConsensusReactor(
 		config, stateMap, blockExecMap, blockStoreInterfaceMap, mempoolMap, evidencePoolMap,
-		privValidator, csMetrics, fastOrStateSyncMap, eventBus, consensusLogger,
+		privValidator, csMetrics, fastOrStateSyncMap, eventBusMap, consensusLogger,
 	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
@@ -961,8 +1001,7 @@ func NewNode(config *cfg.Config,
 	// https://github.com/tendermint/tendermint/issues/4644
 	stateSyncReactor := statesync.NewReactor(
 		*config.StateSync,
-		proxyApp.Snapshot(),
-		proxyApp.Query(),
+		proxyAppMap,
 		config.StateSync.TempDir,
 	)
 	stateSyncReactor.SetLogger(logger.With("module", "statesync"))
@@ -973,6 +1012,12 @@ func NewNode(config *cfg.Config,
 	}
 
 	// Setup Transport.
+	// Added by Yi: The proxyApp could be any one of them
+
+	proxyApp, found := proxyAppMap[allChainIDs[0]]
+	if !found {
+		return nil, fmt.Errorf("failed to get a proxyApp")
+	}
 	transport, peerFilters := createTransport(config, nodeInfo, nodeKey, proxyApp)
 
 	// Setup Switch.
@@ -1048,11 +1093,11 @@ func NewNode(config *cfg.Config,
 		stateSyncGenesisMap: stateMap, // Shouldn't be necessary, but need a way to pass the genesis state
 		pexReactor:        pexReactor,
 		evidencePoolMap:      evidencePoolMap,
-		proxyApp:          proxyApp,
+		proxyAppMap:       proxyAppMap,
 		txIndexerMap:      txIndexerMap,
 		indexerServiceMap: indexerServiceMap,
 		blockIndexerMap:   blockIndexerMap,
-		eventBus:          eventBus,
+		eventBusMap:       eventBusMap,
 		allChainIDs:       allChainIDs,
 	}
 	node.BaseService = *service.NewBaseService(logger, "Node", node)
@@ -1062,6 +1107,11 @@ func NewNode(config *cfg.Config,
 	}
 
 	return node, nil
+}
+
+// Added by Yi
+func (n *Node) AllChainIDs() []string {
+	return n.allChainIDs
 }
 
 // OnStart starts the Node. It implements service.Service.
@@ -1150,9 +1200,12 @@ func (n *Node) OnStop() {
 	n.Logger.Info("Stopping Node")
 
 	// first stop the non-reactor services
-	if err := n.eventBus.Stop(); err != nil {
-		n.Logger.Error("Error closing eventBus", "err", err)
+	for _, eventBus := range n.eventBusMap {
+		if err := eventBus.Stop(); err != nil {
+			n.Logger.Error("Error closing eventBus", "err", err)
+		}
 	}
+
 	for _, indexerService := range n.indexerServiceMap {
 		if err := indexerService.Stop(); err != nil {
 			n.Logger.Error("Error closing indexerService", "err", err)
@@ -1235,8 +1288,9 @@ func (n *Node) ConfigureRPC() error {
 		consensusStateInterfaceMap[k] = v
 	}
 	rpccore.SetEnvironment(&rpccore.Environment{
-		ProxyAppQuery:   n.proxyApp.Query(),
-		ProxyAppMempool: n.proxyApp.Mempool(),
+		//ProxyAppQuery:   n.proxyApp.Query(),
+		//ProxyAppMempool: n.proxyApp.Mempool(),
+		ProxyAppMap:       n.proxyAppMap,
 
 		StateStoreMap:     n.stateStoreMap,
 		BlockStoreMap:     blockStoreInterfaceMap,
@@ -1250,7 +1304,7 @@ func (n *Node) ConfigureRPC() error {
 		TxIndexerMap:     n.txIndexerMap,
 		BlockIndexerMap:  n.blockIndexerMap,
 		ConsensusReactor: n.consensusReactor,
-		EventBus:         n.eventBus,
+		EventBusMap:      n.eventBusMap,
 		MempoolMap:       n.mempoolMap,
 
 		Logger: n.Logger.With("module", "rpc"),
@@ -1295,9 +1349,11 @@ func (n *Node) startRPC() ([]net.Listener, error) {
 		wmLogger := rpcLogger.With("protocol", "websocket")
 		wm := rpcserver.NewWebsocketManager(rpccore.Routes,
 			rpcserver.OnDisconnect(func(remoteAddr string) {
-				err := n.eventBus.UnsubscribeAll(context.Background(), remoteAddr)
-				if err != nil && err != tmpubsub.ErrSubscriptionNotFound {
-					wmLogger.Error("Failed to unsubscribe addr from events", "addr", remoteAddr, "err", err)
+				for _, eventBus := range n.eventBusMap {
+					err := eventBus.UnsubscribeAll(context.Background(), remoteAddr)
+					if err != nil && err != tmpubsub.ErrSubscriptionNotFound {
+						wmLogger.Error("Failed to unsubscribe addr from events", "addr", remoteAddr, "err", err)
+					}
 				}
 			}),
 			rpcserver.ReadLimit(config.MaxBodyBytes),
@@ -1445,8 +1501,8 @@ func (n *Node) EvidencePoolMap() map[string]*evidence.Pool {
 }
 
 // EventBus returns the Node's EventBus.
-func (n *Node) EventBus() *types.EventBus {
-	return n.eventBus
+func (n *Node) EventBusMap() map[string]*types.EventBus {
+	return n.eventBusMap
 }
 
 // PrivValidator returns the Node's PrivValidator.
@@ -1461,8 +1517,8 @@ func (n *Node) GenesisDocMap() map[string]*types.GenesisDoc {
 }
 
 // ProxyApp returns the Node's AppConns, representing its connections to the ABCI application.
-func (n *Node) ProxyApp() proxy.AppConns {
-	return n.proxyApp
+func (n *Node) ProxyAppMap() map[string]proxy.AppConns {
+	return n.proxyAppMap
 }
 
 // Config returns the Node's config.
