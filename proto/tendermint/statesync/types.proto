@@ -3,6 +3,8 @@ package tendermint.statesync;
 
 option go_package = "github.com/tendermint/tendermint/proto/tendermint/statesync";
 
+import "gogoproto/gogo.proto";
+
 message Message {
   oneof sum {
     SnapshotsRequest  snapshots_request  = 1;
@@ -12,7 +14,9 @@ message Message {
   }
 }
 
-message SnapshotsRequest {}
+message SnapshotsRequest {
+  string chain_id = 1 [(gogoproto.customname) = "ChainID"];
+}
 
 message SnapshotsResponse {
   uint64 height   = 1;
@@ -20,12 +24,14 @@ message SnapshotsResponse {
   uint32 chunks   = 3;
   bytes  hash     = 4;
   bytes  metadata = 5;
+  string chain_id = 6 [(gogoproto.customname) = "ChainID"];
 }
 
 message ChunkRequest {
   uint64 height = 1;
   uint32 format = 2;
   uint32 index  = 3;
+  string chain_id = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 message ChunkResponse {
@@ -34,4 +40,5 @@ message ChunkResponse {
   uint32 index   = 3;
   bytes  chunk   = 4;
   bool   missing = 5;
+  string chain_id = 6 [(gogoproto.customname) = "ChainID"];
 }
