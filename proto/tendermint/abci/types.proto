@@ -41,20 +41,25 @@ message Request {
 
 message RequestEcho {
   string message = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
-message RequestFlush {}
+message RequestFlush {
+  string chain_id = 1 [(gogoproto.customname) = "ChainID"];
+}
 
 message RequestInfo {
   string version       = 1;
   uint64 block_version = 2;
   uint64 p2p_version   = 3;
+  string chain_id      = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 // nondeterministic
 message RequestSetOption {
   string key   = 1;
   string value = 2;
+  string chain_id = 3 [(gogoproto.customname) = "ChainID"];
 }
 
 message RequestInitChain {
