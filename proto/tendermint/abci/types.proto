@@ -168,13 +168,17 @@ message Response {
 // nondeterministic
 message ResponseException {
   string error = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseEcho {
   string message = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
-message ResponseFlush {}
+message ResponseFlush {
+  string chain_id = 1 [(gogoproto.customname) = "ChainID"];
+}
 
 message ResponseInfo {
   string data = 1;
@@ -184,6 +188,8 @@ message ResponseInfo {
 
   int64 last_block_height   = 4;
   bytes last_block_app_hash = 5;
+
+  string chain_id           = 6 [(gogoproto.customname) = "ChainID"];
 }
 
 // nondeterministic
@@ -192,12 +198,14 @@ message ResponseSetOption {
   // bytes data = 2;
   string log  = 3;
   string info = 4;
+  string chain_id = 5 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseInitChain {
   ConsensusParams          consensus_params = 1;
   repeated ValidatorUpdate validators       = 2 [(gogoproto.nullable) = false];
   bytes                    app_hash         = 3;
+  string                   chain_id         = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseQuery {
@@ -211,11 +219,13 @@ message ResponseQuery {
   tendermint.crypto.ProofOps proof_ops = 8;
   int64                      height    = 9;
   string                     codespace = 10;
+  string                     chain_id  = 11 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseBeginBlock {
   repeated Event events = 1
       [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+  string chain_id       = 2 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseCheckTx {
@@ -228,6 +238,7 @@ message ResponseCheckTx {
   repeated Event events     = 7
       [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
   string codespace = 8;
+  string chain_id  = 9 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseDeliverTx {
@@ -240,6 +251,7 @@ message ResponseDeliverTx {
   repeated Event events     = 7
       [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"]; // nondeterministic
   string codespace = 8;
+  string chain_id  = 9 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseEndBlock {
@@ -248,20 +260,24 @@ message ResponseEndBlock {
   ConsensusParams consensus_param_updates = 2;
   repeated Event  events                  = 3
       [(gogoproto.nullable) = false, (gogoproto.jsontag) = "events,omitempty"];
+  string chain_id                         = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseCommit {
   // reserve 1
   bytes data          = 2;
   int64 retain_height = 3;
+  string chain_id     = 4 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseListSnapshots {
   repeated Snapshot snapshots = 1;
+  string chain_id             = 2 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseOfferSnapshot {
   Result result = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 
   enum Result {
     UNKNOWN       = 0;  // Unknown result, abort all snapshot restoration
@@ -275,12 +291,14 @@ message ResponseOfferSnapshot {
 
 message ResponseLoadSnapshotChunk {
   bytes chunk = 1;
+  string chain_id = 2 [(gogoproto.customname) = "ChainID"];
 }
 
 message ResponseApplySnapshotChunk {
   Result          result         = 1;
   repeated uint32 refetch_chunks = 2;  // Chunks to refetch and reapply
   repeated string reject_senders = 3;  // Chunk senders to reject and ban
+  string chain_id                = 4 [(gogoproto.customname) = "ChainID"];
 
   enum Result {
     UNKNOWN         = 0;  // Unknown result, abort all snapshot restoration
