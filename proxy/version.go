@@ -13,3 +13,13 @@ var RequestInfo = abci.RequestInfo{
 	BlockVersion: version.BlockProtocol,
 	P2PVersion:   version.P2PProtocol,
 }
+
+// Added by Yi
+func RequestInfoWithChainID(chainID string) abci.RequestInfo {
+	return abci.RequestInfo {
+		Version:      version.TMCoreSemVer,
+		BlockVersion: version.BlockProtocol,
+		P2PVersion:   version.P2PProtocol,
+		ChainID:      chainID,
+	}
+}

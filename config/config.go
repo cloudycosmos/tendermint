@@ -57,6 +57,25 @@ var (
 	defaultSubscriptionBufferSize = 200
 )
 
+// Added by Yi
+var (
+	defaultNodeHome = ""
+)
+
+// Added by Yi
+func init() {
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	defaultNodeHome = filepath.Join(userHomeDir, ".ethdbchaind")
+}
+
+// Added by Yi
+var (
+	allChainIDs = []string{}
+)
+
 // Config defines the top level configuration for a Tendermint node
 type Config struct {
 	// Top level options use an anonymous struct
@@ -219,6 +238,22 @@ type BaseConfig struct { //nolint: maligned
 	// If true, query the ABCI app on connecting to a new peer
 	// so the app can decide if we should keep the connection or not
 	FilterPeers bool `mapstructure:"filter_peers"` // false
+}
+
+// Added by Yi
+// Cosmos-sdk needs to know all the chain ids before tendermint
+// node is initialized.
+func GetAllChainIDs() []string {
+	if len(allChainIDs) < 1  {
+		baseConfig := DefaultBaseConfig()
+		baseConfig.RootDir = defaultNodeHome
+		ids, err := baseConfig.GetAllChainIDs()
+		if err != nil {
+			panic(err.Error())
+		}
+		allChainIDs = ids
+	}
+	return allChainIDs
 }
 
 // DefaultBaseConfig returns a default base configuration for a Tendermint node

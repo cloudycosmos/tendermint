@@ -31,10 +31,7 @@ const (
 
 // replay the wal file
 func RunReplayFile(config cfg.BaseConfig, csConfig *cfg.ConsensusConfig, console bool) {
-	chainIDs, err := config.GetAllChainIDs()
-	if err != nil {
-		panic(err)
-	}
+	chainIDs := cfg.GetAllChainIDs()
 	for _, chainID := range chainIDs {
 		consensusState := newConsensusStateForReplay(config, csConfig, chainID)
 
@@ -328,7 +325,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 
 	handshaker := NewHandshaker(stateStore, state, blockStore, gdoc)
 	handshaker.SetEventBus(eventBus)
-	err = handshaker.Handshake(proxyApp)
+	err = handshaker.Handshake(proxyApp, chainID)
 	if err != nil {
 		tmos.Exit(fmt.Sprintf("Error on handshake: %v", err))
 	}

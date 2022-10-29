@@ -98,10 +98,18 @@ func DefaultNewNode(config *cfg.Config, logger log.Logger) (*Node, error) {
 		return nil, fmt.Errorf("failed to load or gen node key %s: %w", config.NodeKeyFile(), err)
 	}
 
+	// Added by Yi
+	clientCreatorMap := make(map[string]proxy.ClientCreator)
+	for _, chainID := range cfg.GetAllChainIDs() {
+		cc := proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir())
+		clientCreatorMap[chainID] = cc
+	}
+
 	return NewNode(config,
 		privval.LoadOrGenFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile()),
 		nodeKey,
-		proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
+//		proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
+		clientCreatorMap,
 		DefaultGenesisDocProviderFunc(config),
 		DefaultDBProvider,
 		DefaultMetricsProvider(config.Instrumentation),
@@ -390,12 +398,13 @@ func doHandshake(
 	genDoc *types.GenesisDoc,
 	eventBus types.BlockEventPublisher,
 	proxyApp proxy.AppConns,
-	consensusLogger log.Logger) error {
+	consensusLogger log.Logger,
+	chainID string) error {
 
 	handshaker := cs.NewHandshaker(stateStore, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp); err != nil {
+	if err := handshaker.Handshake(proxyApp, chainID); err != nil {
 		return fmt.Errorf("error during handshake: %v", err)
 	}
 	return nil
@@ -791,17 +800,14 @@ func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reacto
 func NewNode(config *cfg.Config,
 	privValidator types.PrivValidator,
 	nodeKey *p2p.NodeKey,
-	clientCreator proxy.ClientCreator,
+	clientCreatorMap map[string]proxy.ClientCreator,
 	genesisDocProvider GenesisDocProvider,
 	dbProvider DBProvider,
 	metricsProvider MetricsProvider,
 	logger log.Logger,
 	options ...Option) (*Node, error) {
 
-	allChainIDs, err := config.GetAllChainIDs()
-	if err != nil {
-		return nil, err
-	}
+	allChainIDs := cfg.GetAllChainIDs()
 
 	blockStoreMap, stateDBMap, err := initDBs(config, dbProvider, allChainIDs)
 	if err != nil {
@@ -824,7 +830,7 @@ func NewNode(config *cfg.Config,
 	// Create the proxyApp and establish connections to the ABCI app (consensus, mempool, query).
 	proxyAppMap := make(map[string]proxy.AppConns, len(allChainIDs))
 	for _, chainID := range(allChainIDs) {
-		proxyApp, err := createAndStartProxyAppConns(clientCreator, logger)
+		proxyApp, err := createAndStartProxyAppConns(clientCreatorMap[chainID], logger)
 		if err != nil {
 			return nil, err
 		}
@@ -903,7 +909,7 @@ func NewNode(config *cfg.Config,
 		// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 		// and replays any blocks as necessary to sync tendermint with the app.
 		if !stateSync {
-			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger, chainID); err != nil {
 				return nil, err
 			}
 
