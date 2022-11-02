@@ -156,6 +156,7 @@ func NewState(
 	blockStore sm.BlockStore,
 	txNotifier txNotifier,
 	evpool evidencePool,
+	chainID string,
 	options ...StateOption,
 ) *State {
 	cs := &State{
@@ -173,6 +174,7 @@ func NewState(
 		evpool:           evpool,
 		evsw:             tmevents.NewEventSwitch(),
 		metrics:          NopMetrics(),
+		chainID:          chainID,
 	}
 
 	// set function defaults (may be overwritten before calling Start)
@@ -347,15 +349,15 @@ func (cs *State) OnStart() error {
 			repairAttempted = true
 
 			// 2) backup original WAL file
-			corruptedFile := fmt.Sprintf("%s.CORRUPTED", cs.config.WalFile())
-			if err := tmos.CopyFile(cs.config.WalFile(), corruptedFile); err != nil {
+			corruptedFile := fmt.Sprintf("%s.CORRUPTED", cs.config.WalFile(cs.ChainID))
+			if err := tmos.CopyFile(cs.config.WalFile(cs.ChainID), corruptedFile); err != nil {
 				return err
 			}
 
-			cs.Logger.Debug("backed up WAL file", "src", cs.config.WalFile(), "dst", corruptedFile)
+			cs.Logger.Debug("backed up WAL file", "src", cs.config.WalFile(cs.ChainID), "dst", corruptedFile)
 
 			// 3) try to repair (WAL file will be overwritten!)
-			if err := repairWalFile(corruptedFile, cs.config.WalFile()); err != nil {
+			if err := repairWalFile(corruptedFile, cs.config.WalFile(cs.ChainID)); err != nil {
 				cs.Logger.Error("the WAL repair failed", "err", err)
 				return err
 			}
@@ -402,7 +404,7 @@ func (cs *State) startRoutines(maxSteps int) {
 
 // loadWalFile loads WAL data from file. It overwrites cs.wal.
 func (cs *State) loadWalFile() error {
-	wal, err := cs.OpenWAL(cs.config.WalFile())
+	wal, err := cs.OpenWAL(cs.config.WalFile(cs.chainID))
 	if err != nil {
 		cs.Logger.Error("failed to load state WAL", "err", err)
 		return err

@@ -1061,11 +1061,11 @@ func (cfg *ConsensusConfig) Commit(t time.Time) time.Time {
 }
 
 // WalFile returns the full path to the write-ahead log file
-func (cfg *ConsensusConfig) WalFile() string {
+func (cfg *ConsensusConfig) WalFile(chainID string) string {
 	if cfg.walFile != "" {
-		return cfg.walFile
+		return cfg.walFile + "_" + chainID
 	}
-	return rootify(cfg.WalPath, cfg.RootDir)
+	return rootify(cfg.WalPath + "_" + chainID, cfg.RootDir)
 }
 
 // SetWalFile sets the path to the write-ahead log file

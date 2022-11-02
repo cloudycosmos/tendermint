@@ -562,6 +562,7 @@ func createConsensusReactor(config *cfg.Config,
 			blockStore,
 			mempool,
 			evidencePool,
+			chainID,
 			cs.StateMetrics(csMetrics),
 		)
 		consensusState.SetLogger(consensusLogger)
