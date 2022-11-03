@@ -238,8 +238,8 @@ func (h *Handshaker) NBlocks() int {
 }
 
 // TODO: retry the handshake/replay if it fails ?
-func (h *Handshaker) Handshake(proxyApp proxy.AppConns, chainID string) error {
-
+func (h *Handshaker) Handshake(proxyApp proxy.AppConns) error {
+	chainID := h.genDoc.ChainID
 	// Handshake is done via ABCI Info on the query conn.
 	res, err := proxyApp.Query().InfoSync(proxy.RequestInfoWithChainID(chainID))
 	if err != nil {

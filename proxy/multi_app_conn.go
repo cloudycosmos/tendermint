@@ -32,8 +32,8 @@ type AppConns interface {
 }
 
 // NewAppConns calls NewMultiAppConn.
-func NewAppConns(clientCreator ClientCreator) AppConns {
-	return NewMultiAppConn(clientCreator)
+func NewAppConns(clientCreator ClientCreator, chainID string) AppConns {
+	return NewMultiAppConn(clientCreator, chainID)
 }
 
 // multiAppConn implements AppConns.
@@ -55,12 +55,15 @@ type multiAppConn struct {
 	snapshotConnClient  abcicli.Client
 
 	clientCreator ClientCreator
+
+	chainID string
 }
 
 // NewMultiAppConn makes all necessary abci connections to the application.
-func NewMultiAppConn(clientCreator ClientCreator) AppConns {
+func NewMultiAppConn(clientCreator ClientCreator, chainID string) AppConns {
 	multiAppConn := &multiAppConn{
 		clientCreator: clientCreator,
+		chainID: chainID,
 	}
 	multiAppConn.BaseService = *service.NewBaseService(nil, "multiAppConn", multiAppConn)
 	return multiAppConn

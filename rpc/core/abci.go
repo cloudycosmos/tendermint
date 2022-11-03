@@ -21,7 +21,7 @@ func ABCIQuery(
 ) (*ctypes.ResultABCIQuery, error) {
 	proxyApp, found := env.ProxyAppMap[chainId]
 	if !found {
-		return nil, errors.New("failed to get proxyApp")
+		return nil, errors.New("ABCIQuery failed to get proxyApp")
 	}
 	proxyAppQuery := proxyApp.Query()
 	resQuery, err := proxyAppQuery.QuerySync(abci.RequestQuery{
@@ -43,7 +43,7 @@ func ABCIQuery(
 func ABCIInfo(ctx *rpctypes.Context, chainId string) (*ctypes.ResultABCIInfo, error) {
 	proxyApp, found := env.ProxyAppMap[chainId]
 	if !found {
-		return nil, errors.New("failed to get proxyApp")
+		return nil, errors.New("ABCIInfo failed to get proxyApp")
 	}
 	proxyAppQuery := proxyApp.Query()
 	resInfo, err := proxyAppQuery.InfoSync(proxy.RequestInfo)

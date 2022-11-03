@@ -30,6 +30,7 @@ import (
 func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int, chainID string) (err error) {
 	config := getConfig(t)
 
+	// YITODO: Need inspection!!!
 	app := kvstore.NewPersistentKVStoreApplication(filepath.Join(config.DBDir(), "wal_generator"))
 
 	logger := log.TestingLogger().With("wal_generator", "wal_generator")
@@ -59,7 +60,7 @@ func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int, chainID strin
 
 	blockStore := store.NewBlockStore(blockStoreDB)
 
-	proxyApp := proxy.NewAppConns(proxy.NewLocalClientCreator(app))
+	proxyApp := proxy.NewAppConns(proxy.NewLocalClientCreator(app), chainID)
 	proxyApp.SetLogger(logger.With("module", "proxy"))
 	if err := proxyApp.Start(); err != nil {
 		return fmt.Errorf("failed to start proxy app connections: %w", err)

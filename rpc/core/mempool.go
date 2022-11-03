@@ -179,7 +179,7 @@ func NumUnconfirmedTxs(ctx *rpctypes.Context, chainID string) (*ctypes.ResultUnc
 func CheckTx(ctx *rpctypes.Context, chainID string, tx types.Tx) (*ctypes.ResultCheckTx, error) {
 	proxyApp, found := env.ProxyAppMap[chainID]
 	if !found {
-		return nil, errors.New("failed to get proxyApp")
+		return nil, errors.New("CheckTx failed to get proxyApp")
 	}
 	proxyAppMempool := proxyApp.Mempool()
 

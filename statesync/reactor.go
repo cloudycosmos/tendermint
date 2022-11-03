@@ -238,7 +238,7 @@ func (r *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 func (r *Reactor) recentSnapshots(n uint32, chainID string) ([]*snapshot, error) {
 	proxyApp, found := r.proxyAppMap[chainID]
 	if !found {
-		return nil, errors.New("failed to get proxyApp")
+		return nil, errors.New("recentSnapshots failed to get proxyApp")
 	}
         conn := proxyApp.Snapshot()
 	resp, err := conn.ListSnapshotsSync(abci.RequestListSnapshots{})
@@ -283,7 +283,7 @@ func (r *Reactor) Sync(stateProvider StateProvider, discoveryTime time.Duration,
 	}
 	proxyApp, found := r.proxyAppMap[chainID]
 	if !found {
-		return  sm.State{}, nil, errors.New("failed to get proxyApp")
+		return  sm.State{}, nil, errors.New("Sync failed to get proxyApp")
 	}
 	conn := proxyApp.Snapshot()
 	connQuery := proxyApp.Query()

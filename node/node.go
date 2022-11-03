@@ -284,8 +284,8 @@ func initDBsRaw(config *cfg.Config, dbProvider DBProvider, chainID string) (bloc
 	return
 }
 
-func createAndStartProxyAppConns(clientCreator proxy.ClientCreator, logger log.Logger) (proxy.AppConns, error) {
-	proxyApp := proxy.NewAppConns(clientCreator)
+func createAndStartProxyAppConns(clientCreator proxy.ClientCreator, logger log.Logger, chainID string) (proxy.AppConns, error) {
+	proxyApp := proxy.NewAppConns(clientCreator, chainID)
 	proxyApp.SetLogger(logger.With("module", "proxy"))
 	if err := proxyApp.Start(); err != nil {
 		return nil, fmt.Errorf("error starting proxy app connections: %v", err)
@@ -398,13 +398,12 @@ func doHandshake(
 	genDoc *types.GenesisDoc,
 	eventBus types.BlockEventPublisher,
 	proxyApp proxy.AppConns,
-	consensusLogger log.Logger,
-	chainID string) error {
+	consensusLogger log.Logger) error {
 
 	handshaker := cs.NewHandshaker(stateStore, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
-	if err := handshaker.Handshake(proxyApp, chainID); err != nil {
+	if err := handshaker.Handshake(proxyApp); err != nil {
 		return fmt.Errorf("error during handshake: %v", err)
 	}
 	return nil
@@ -831,7 +830,7 @@ func NewNode(config *cfg.Config,
 	// Create the proxyApp and establish connections to the ABCI app (consensus, mempool, query).
 	proxyAppMap := make(map[string]proxy.AppConns, len(allChainIDs))
 	for _, chainID := range(allChainIDs) {
-		proxyApp, err := createAndStartProxyAppConns(clientCreatorMap[chainID], logger)
+		proxyApp, err := createAndStartProxyAppConns(clientCreatorMap[chainID], logger, chainID)
 		if err != nil {
 			return nil, err
 		}
@@ -910,7 +909,7 @@ func NewNode(config *cfg.Config,
 		// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 		// and replays any blocks as necessary to sync tendermint with the app.
 		if !stateSync {
-			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger, chainID); err != nil {
+			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
 				return nil, err
 			}
 
