@@ -326,7 +326,7 @@ func createAndStartIndexerService(
 	txIndexerMap      := make(map[string]txindex.TxIndexer)
 	blockIndexerMap   := make(map[string]indexer.BlockIndexer)
 
-	var dbHolder dbm.DB
+	var dbHolder *dbm.DB
 	for _, chainID := range(chainIDs) {
 		eventBus, found := eventBusMap[chainID]
 		if !found {
@@ -335,7 +335,7 @@ func createAndStartIndexerService(
 		}
 
 		indexerService, txIndexer, blockIndexer, err := createAndStartIndexerServiceRaw(config,
-			chainID, dbProvider, eventBus, logger, &dbHolder)
+			chainID, dbProvider, eventBus, logger, dbHolder)
 		if err != nil {
 			return indexerServiceMap, txIndexerMap, blockIndexerMap, err
 		}
@@ -926,7 +926,7 @@ func NewNode(config *cfg.Config,
 		logNodeStartupInfo(state, pubKey, logger, consensusLogger)
 	}
 
-	// TODO: Let's handle Metrics later. For now it's just NopMetrics
+	// YITODO: Let's handle Metrics later. For now it's just NopMetrics
 	csMetrics, p2pMetrics, memplMetrics, smMetrics := metricsProvider("fake-chain-id")
 
 	// Make MempoolReactor
