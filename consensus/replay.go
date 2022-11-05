@@ -206,12 +206,15 @@ type Handshaker struct {
 	logger       log.Logger
 
 	nBlocks int // number of blocks applied to the state
+
+	chainID string
 }
 
-func NewHandshaker(stateStore sm.Store, state sm.State,
+func NewHandshaker(chainID string, stateStore sm.Store, state sm.State,
 	store sm.BlockStore, genDoc *types.GenesisDoc) *Handshaker {
 
 	return &Handshaker{
+		chainID:      chainID,
 		stateStore:   stateStore,
 		initialState: state,
 		store:        store,
@@ -468,7 +471,7 @@ func (h *Handshaker) replayBlocks(
 			assertAppHashEqualsOneFromBlock(appHash, block)
 		}
 
-		appHash, err = sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, h.stateStore, h.genDoc.InitialHeight)
+		appHash, err = sm.ExecCommitBlock(proxyApp.Consensus(), block, h.logger, h.stateStore, h.genDoc.InitialHeight, h.chainID)
 		if err != nil {
 			return nil, err
 		}
@@ -496,7 +499,7 @@ func (h *Handshaker) replayBlock(state sm.State, height int64, proxyApp proxy.Ap
 
 	// Use stubs for both mempool and evidence pool since no transactions nor
 	// evidence are needed here - block already exists.
-	blockExec := sm.NewBlockExecutorRaw(h.stateStore, h.logger, proxyApp, emptyMempool{}, sm.EmptyEvidencePool{})
+	blockExec := sm.NewBlockExecutorRaw(h.chainID, h.stateStore, h.logger, proxyApp, emptyMempool{}, sm.EmptyEvidencePool{})
 	blockExec.SetEventBus(h.eventBus)
 
 	var err error

@@ -323,7 +323,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 		tmos.Exit(fmt.Sprintf("Failed to start event bus: %v", err))
 	}
 
-	handshaker := NewHandshaker(stateStore, state, blockStore, gdoc)
+	handshaker := NewHandshaker(chainID, stateStore, state, blockStore, gdoc)
 	handshaker.SetEventBus(eventBus)
 	err = handshaker.Handshake(proxyApp)
 	if err != nil {
@@ -331,7 +331,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 	}
 
 	mempool, evpool := emptyMempool{}, sm.EmptyEvidencePool{}
-	blockExec := sm.NewBlockExecutorRaw(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
+	blockExec := sm.NewBlockExecutorRaw(chainID, stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
 
 	consensusState := NewState(csConfig, state.Copy(), blockExec,
 		blockStore, mempool, evpool, chainID)

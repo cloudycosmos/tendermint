@@ -55,6 +55,10 @@ import (
 	_ "github.com/lib/pq" // provide the psql db driver
 )
 
+var (
+	tx_index_db	dbm.DB
+)
+
 //------------------------------------------------------------------------------
 
 // DBContext specifies config information for loading a new DB.
@@ -326,7 +330,6 @@ func createAndStartIndexerService(
 	txIndexerMap      := make(map[string]txindex.TxIndexer)
 	blockIndexerMap   := make(map[string]indexer.BlockIndexer)
 
-	var dbHolder *dbm.DB
 	for _, chainID := range(chainIDs) {
 		eventBus, found := eventBusMap[chainID]
 		if !found {
@@ -335,7 +338,7 @@ func createAndStartIndexerService(
 		}
 
 		indexerService, txIndexer, blockIndexer, err := createAndStartIndexerServiceRaw(config,
-			chainID, dbProvider, eventBus, logger, dbHolder)
+			chainID, dbProvider, eventBus, logger)
 		if err != nil {
 			return indexerServiceMap, txIndexerMap, blockIndexerMap, err
 		}
@@ -353,7 +356,6 @@ func createAndStartIndexerServiceRaw(
 	dbProvider DBProvider,
 	eventBus *types.EventBus,
 	logger log.Logger,
-	dbHolder *dbm.DB,
 ) (*txindex.IndexerService, txindex.TxIndexer, indexer.BlockIndexer, error) {
 
 	var (
@@ -363,14 +365,14 @@ func createAndStartIndexerServiceRaw(
 
 	switch config.TxIndex.Indexer {
 	case "kv":
-		if dbHolder == nil {
-			db, err := dbProvider(&DBContext{"tx_index", config})
+		if tx_index_db == nil {
+			var err error
+			tx_index_db, err = dbProvider(&DBContext{"tx_index", config})
 			if err != nil {
-				return nil, nil, nil, err
+				panic("failed to open tx_index db")
 			}
-			dbHolder = &db
 		}
-		store := dbm.NewPrefixDB(*dbHolder, []byte(chainID))
+		store := dbm.NewPrefixDB(tx_index_db, []byte(chainID))
 
 		txIndexer = kv.NewTxIndex(store)
 		blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
@@ -392,6 +394,7 @@ func createAndStartIndexerServiceRaw(
 }
 
 func doHandshake(
+	chainID string,
 	stateStore sm.Store,
 	state sm.State,
 	blockStore sm.BlockStore,
@@ -400,7 +403,7 @@ func doHandshake(
 	proxyApp proxy.AppConns,
 	consensusLogger log.Logger) error {
 
-	handshaker := cs.NewHandshaker(stateStore, state, blockStore, genDoc)
+	handshaker := cs.NewHandshaker(chainID, stateStore, state, blockStore, genDoc)
 	handshaker.SetLogger(consensusLogger)
 	handshaker.SetEventBus(eventBus)
 	if err := handshaker.Handshake(proxyApp); err != nil {
@@ -909,7 +912,7 @@ func NewNode(config *cfg.Config,
 		// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 		// and replays any blocks as necessary to sync tendermint with the app.
 		if !stateSync {
-			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+			if err := doHandshake(chainID, stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
 				return nil, err
 			}
 

@@ -40,6 +40,8 @@ type BlockExecutor struct {
 	logger log.Logger
 
 	metrics *Metrics
+
+	chainID string    // Added by Yi. We want to pass chainID eventually to some logger.info
 }
 
 type BlockExecutorOption func(executor *BlockExecutor)
@@ -78,6 +80,7 @@ func NewBlockExecutor(
 		}
 
 		res := NewBlockExecutorRaw(
+			chainID,
 			stateStore,
 			logger,
 			proxyApp.Consensus(),
@@ -93,6 +96,7 @@ func NewBlockExecutor(
 }
 
 func NewBlockExecutorRaw(
+	chainID string,
 	stateStore Store,
 	logger log.Logger,
 	proxyApp proxy.AppConnConsensus,
@@ -101,6 +105,7 @@ func NewBlockExecutorRaw(
 	options ...BlockExecutorOption,
 ) *BlockExecutor {
 	res := &BlockExecutor{
+		chainID:  chainID,
 		store:    stateStore,
 		proxyApp: proxyApp,
 		eventBus: types.NopEventBus{},
@@ -178,7 +183,7 @@ func (blockExec *BlockExecutor) ApplyBlock(
 
 	startTime := time.Now().UnixNano()
 	abciResponses, err := execBlockOnProxyApp(
-		blockExec.logger, blockExec.proxyApp, block, blockExec.store, state.InitialHeight,
+		blockExec.logger, blockExec.proxyApp, block, blockExec.store, state.InitialHeight, blockExec.chainID,
 	)
 	endTime := time.Now().UnixNano()
 	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
@@ -302,6 +307,7 @@ func execBlockOnProxyApp(
 	block *types.Block,
 	store Store,
 	initialHeight int64,
+	chainID string,
 ) (*tmstate.ABCIResponses, error) {
 	var validTxs, invalidTxs = 0, 0
 
@@ -370,7 +376,7 @@ func execBlockOnProxyApp(
 		return nil, err
 	}
 
-	logger.Info("executed block", "height", block.Height, "num_valid_txs", validTxs, "num_invalid_txs", invalidTxs)
+	logger.Info("executed block", "height", block.Height, "num_valid_txs", validTxs, "num_invalid_txs", invalidTxs, "chain-id", chainID)
 	return abciResponses, nil
 }
 
@@ -573,8 +579,9 @@ func ExecCommitBlock(
 	logger log.Logger,
 	store Store,
 	initialHeight int64,
+	chainID string,
 ) ([]byte, error) {
-	_, err := execBlockOnProxyApp(logger, appConnConsensus, block, store, initialHeight)
+	_, err := execBlockOnProxyApp(logger, appConnConsensus, block, store, initialHeight, chainID)
 	if err != nil {
 		logger.Error("failed executing block on proxy app", "height", block.Height, "err", err)
 		return nil, err
