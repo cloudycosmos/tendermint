@@ -141,7 +141,7 @@ func testnetFiles(cmd *cobra.Command, args []string) error {
 		}
 
 		pvKeyFile := filepath.Join(nodeDir, config.BaseConfig.PrivValidatorKey)
-		pvStateFile := filepath.Join(nodeDir, config.BaseConfig.PrivValidatorState)
+		pvStateFile := filepath.Join(nodeDir, config.BaseConfig.PrivValidatorStateDir, chainID + ".json")
 		pv := privval.LoadFilePV(pvKeyFile, pvStateFile)
 
 		pubKey, err := pv.GetPubKey()

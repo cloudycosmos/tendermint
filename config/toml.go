@@ -124,14 +124,14 @@ log_format = "{{ .BaseConfig.LogFormat }}"
 
 ##### additional base config options #####
 
-# Path to the JSON file containing the initial validator set and other meta data
+# Directory contains paths to the JSON files containing the initial validator set and other meta data
 genesis_dir = "{{ js .BaseConfig.GenesisDir }}"
 
 # Path to the JSON file containing the private key to use as a validator in the consensus protocol
 priv_validator_key_file = "{{ js .BaseConfig.PrivValidatorKey }}"
 
-# Path to the JSON file containing the last sign state of a validator
-priv_validator_state_file = "{{ js .BaseConfig.PrivValidatorState }}"
+# Directory contains paths to the JSON files containing the last sign state of a validator
+priv_validator_state_dir = "{{ js .BaseConfig.PrivValidatorStateDir }}"
 
 # TCP or UNIX socket address for Tendermint to listen on for
 # connections from an external PrivValidator process
@@ -522,7 +522,7 @@ func ResetTestRootWithChainID(testName string, chainID string) *Config {
 	configFilePath := filepath.Join(rootDir, defaultConfigFilePath)
 	genesisDir := filepath.Join(rootDir, baseConfig.GenesisDir)
 	privKeyFilePath := filepath.Join(rootDir, baseConfig.PrivValidatorKey)
-	privStateFilePath := filepath.Join(rootDir, baseConfig.PrivValidatorState)
+	privStateDir := filepath.Join(rootDir, baseConfig.PrivValidatorStateDir)
 
 	// Write default config file if missing.
 	if !tmos.FileExists(configFilePath) {
@@ -541,7 +541,7 @@ func ResetTestRootWithChainID(testName string, chainID string) *Config {
 	}
 	// we always overwrite the priv val
 	tmos.MustWriteFile(privKeyFilePath, []byte(testPrivValidatorKey), 0644)
-	tmos.MustWriteFile(privStateFilePath, []byte(testPrivValidatorState), 0644)
+	tmos.MustWriteFile(filepath.Join(privStateDir, chainID + ".json"), []byte(testPrivValidatorState), 0644)
 
 	config := TestConfig().SetRoot(rootDir)
 	return config

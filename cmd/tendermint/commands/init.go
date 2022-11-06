@@ -28,7 +28,8 @@ func initFiles(cmd *cobra.Command, args []string) error {
 func initFilesWithConfig(config *cfg.Config) error {
 	// private validator
 	privValKeyFile := config.PrivValidatorKeyFile()
-	privValStateFile := config.PrivValidatorStateFile()
+	chainID := "fake-chain-id-38"    // YITODO: need a better chainID
+	privValStateFile := config.PrivValidatorStateFile(chainID)
 	var pv *privval.FilePV
 	if tmos.FileExists(privValKeyFile) {
 		pv = privval.LoadFilePV(privValKeyFile, privValStateFile)

@@ -59,11 +59,12 @@ func resetAllCmd(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	chainID := "fake-chain-id-62"   // YITODO: need a better chainID
 	return resetAll(
 		config.DBDir(),
 		config.P2P.AddrBookFile(),
 		config.PrivValidatorKeyFile(),
-		config.PrivValidatorStateFile(),
+		config.PrivValidatorStateFile(chainID),  // YITODO: perhaps we need to reset all privValidator state files
 		logger,
 	)
 }
@@ -76,7 +77,8 @@ func resetPrivValidator(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	resetFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile(), logger)
+	chainID := "fake-chain-id-80"   // YITODO: need a better chainID
+	resetFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile(chainID), logger)
 	return nil
 }
 

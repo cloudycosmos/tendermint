@@ -40,7 +40,7 @@ func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int, chainID strin
 	// NOTE: we can't import node package because of circular dependency.
 	// NOTE: we don't do handshake so need to set state.Version.Consensus.App directly.
 	privValidatorKeyFile := config.PrivValidatorKeyFile()
-	privValidatorStateFile := config.PrivValidatorStateFile()
+	privValidatorStateFile := config.PrivValidatorStateFile(chainID)
 	privValidator := privval.LoadOrGenFilePV(privValidatorKeyFile, privValidatorStateFile)
 	genDoc, err := types.GenesisDocFromFile(config.GenesisFile(chainID))
 	if err != nil {

@@ -25,7 +25,8 @@ func showValidator(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("private validator file %s does not exist", keyFilePath)
 	}
 
-	pv := privval.LoadFilePV(keyFilePath, config.PrivValidatorStateFile())
+	chainID := "fake-chain-id-28"  // YITODO: need a better chainID
+	pv := privval.LoadFilePV(keyFilePath, config.PrivValidatorStateFile(chainID))
 
 	pubKey, err := pv.GetPubKey()
 	if err != nil {

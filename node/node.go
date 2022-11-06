@@ -96,7 +96,7 @@ type Provider func(*cfg.Config, log.Logger) (*Node, error)
 // DefaultNewNode returns a Tendermint node with default settings for the
 // PrivValidator, ClientCreator, GenesisDoc, and DBProvider.
 // It implements NodeProvider.
-func DefaultNewNode(config *cfg.Config, logger log.Logger) (*Node, error) {
+func DefaultNewNode(config *cfg.Config, logger log.Logger, chainID string) (*Node, error) {
 	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or gen node key %s: %w", config.NodeKeyFile(), err)
@@ -104,13 +104,17 @@ func DefaultNewNode(config *cfg.Config, logger log.Logger) (*Node, error) {
 
 	// Added by Yi
 	clientCreatorMap := make(map[string]proxy.ClientCreator)
+	privValidatorMap := make(map[string]types.PrivValidator)
 	for _, chainID := range cfg.GetAllChainIDs() {
 		cc := proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir())
 		clientCreatorMap[chainID] = cc
+
+		privValidator := privval.LoadOrGenFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile(chainID))
+		privValidatorMap[chainID] = privValidator
 	}
 
 	return NewNode(config,
-		privval.LoadOrGenFilePV(config.PrivValidatorKeyFile(), config.PrivValidatorStateFile()),
+		privValidatorMap,
 		nodeKey,
 //		proxy.DefaultClientCreator(config.ProxyApp, config.ABCI, config.DBDir()),
 		clientCreatorMap,
@@ -205,9 +209,9 @@ type Node struct {
 	service.BaseService
 
 	// config
-	config        *cfg.Config
-	genesisDocMap map[string]*types.GenesisDoc   // initial validator set
-	privValidator types.PrivValidator // local node's validator key
+	config           *cfg.Config
+	genesisDocMap    map[string]*types.GenesisDoc   // initial validator set
+	privValidatorMap map[string]types.PrivValidator // local node's validator key
 
 	// network
 	transport   *p2p.MultiplexTransport
@@ -536,7 +540,7 @@ func createConsensusReactor(config *cfg.Config,
 	blockStoreMap map[string]sm.BlockStore,
 	mempoolMap map[string]*mempl.CListMempool,
 	evidencePoolMap map[string]*evidence.Pool,
-	privValidator types.PrivValidator,
+	privValidatorMap map[string]types.PrivValidator,
 	csMetrics *cs.Metrics,
 	waitSyncMap map[string]bool,
 	eventBusMap map[string]*types.EventBus,
@@ -554,6 +558,9 @@ func createConsensusReactor(config *cfg.Config,
 			panic("failed to get mempool")		//TODO: make a better error out 
 		}
 		evidencePool, found := evidencePoolMap[chainID]; if !found {
+			panic("failed to get evidencePool")	//TODO: make a better error out 
+		}
+		privValidator, found := privValidatorMap[chainID]; if !found {
 			panic("failed to get evidencePool")	//TODO: make a better error out 
 		}
 
@@ -801,7 +808,7 @@ func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reacto
 
 // NewNode returns a new, ready to go, Tendermint Node.
 func NewNode(config *cfg.Config,
-	privValidator types.PrivValidator,
+	privValidatorMap map[string]types.PrivValidator,
 	nodeKey *p2p.NodeKey,
 	clientCreatorMap map[string]proxy.ClientCreator,
 	genesisDocProvider GenesisDocProvider,
@@ -861,6 +868,15 @@ func NewNode(config *cfg.Config,
 		// Do nothing, we don't support it for now
 	}
 
+	// Added by Yi
+	var privValidator types.PrivValidator
+	for _, tmpPrivValidator := range privValidatorMap {
+		privValidator = tmpPrivValidator
+		break
+	}
+	if privValidator == nil {
+		panic("failed to get privValidator!")
+	}
 	pubKey, err := privValidator.GetPubKey()
 	if err != nil {
 		return nil, fmt.Errorf("can't get pubkey: %w", err)
@@ -1001,7 +1017,7 @@ func NewNode(config *cfg.Config,
 	}
 	consensusReactor, consensusStateMap := createConsensusReactor(
 		config, stateMap, blockExecMap, blockStoreInterfaceMap, mempoolMap, evidencePoolMap,
-		privValidator, csMetrics, fastOrStateSyncMap, eventBusMap, consensusLogger,
+		privValidatorMap, csMetrics, fastOrStateSyncMap, eventBusMap, consensusLogger,
 	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
@@ -1080,9 +1096,9 @@ func NewNode(config *cfg.Config,
 		mempoolInterfaceMap[k] = v
 	}
 	node := &Node{
-		config:        config,
-		genesisDocMap: genDocMap,
-		privValidator: privValidator,
+		config:           config,
+		genesisDocMap:    genDocMap,
+		privValidatorMap: privValidatorMap,
 
 		transport: transport,
 		sw:        sw,
@@ -1247,9 +1263,11 @@ func (n *Node) OnStop() {
 		}
 	}
 
-	if pvsc, ok := n.privValidator.(service.Service); ok {
-		if err := pvsc.Stop(); err != nil {
-			n.Logger.Error("Error closing private validator", "err", err)
+	for _, privValidator := range n.privValidatorMap {
+		if pvsc, ok := privValidator.(service.Service); ok {
+			if err := pvsc.Stop(); err != nil {
+				n.Logger.Error("Error closing private validator", "err", err)
+			}
 		}
 	}
 
@@ -1277,7 +1295,15 @@ func (n *Node) OnStop() {
 
 // ConfigureRPC makes sure RPC has all the objects it needs to operate.
 func (n *Node) ConfigureRPC() error {
-	pubKey, err := n.privValidator.GetPubKey()
+	var privValidator types.PrivValidator
+	for _, tmpPrivValidator := range n.privValidatorMap {
+		privValidator = tmpPrivValidator
+		break
+	}
+	if  privValidator == nil {
+		panic("failed to get privValidator!")
+	}
+	pubKey, err := privValidator.GetPubKey()
 	if err != nil {
 		return fmt.Errorf("can't get pubkey: %w", err)
 	}
@@ -1516,8 +1542,8 @@ func (n *Node) EventBusMap() map[string]*types.EventBus {
 
 // PrivValidator returns the Node's PrivValidator.
 // XXX: for convenience only!
-func (n *Node) PrivValidator() types.PrivValidator {
-	return n.privValidator
+func (n *Node) PrivValidatorMap() map[string]types.PrivValidator {
+	return n.privValidatorMap
 }
 
 // GenesisDoc returns the Node's GenesisDoc.

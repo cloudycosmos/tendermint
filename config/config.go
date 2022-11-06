@@ -37,18 +37,19 @@ var (
 	defaultConfigDir     = "config"
 	defaultDataDir       = "data"
         defaultGenesisDir    = "config/genesis"
+	defaultPrivValStateDir = "data/priv_validator_state"
 
 	defaultConfigFileName  = "config.toml"
 
 	defaultPrivValKeyName   = "priv_validator_key.json"
-	defaultPrivValStateName = "priv_validator_state.json"
+	//defaultPrivValStateName = "priv_validator_state.json"
 
 	defaultNodeKeyName  = "node_key.json"
 	defaultAddrBookName = "addrbook.json"
 
 	defaultConfigFilePath   = filepath.Join(defaultConfigDir, defaultConfigFileName)
 	defaultPrivValKeyPath   = filepath.Join(defaultConfigDir, defaultPrivValKeyName)
-	defaultPrivValStatePath = filepath.Join(defaultDataDir, defaultPrivValStateName)
+	//defaultPrivValStatePath = filepath.Join(defaultDataDir, defaultPrivValStateName)
 
 	defaultNodeKeyPath  = filepath.Join(defaultConfigDir, defaultNodeKeyName)
 	defaultAddrBookPath = filepath.Join(defaultConfigDir, defaultAddrBookName)
@@ -222,8 +223,8 @@ type BaseConfig struct { //nolint: maligned
 	// Path to the JSON file containing the private key to use as a validator in the consensus protocol
 	PrivValidatorKey string `mapstructure:"priv_validator_key_file"`
 
-	// Path to the JSON file containing the last sign state of a validator
-	PrivValidatorState string `mapstructure:"priv_validator_state_file"`
+	// Directory to contain all the JSON files containing the last sign state of a validator
+	PrivValidatorStateDir string `mapstructure:"priv_validator_state_dir"`
 
 	// TCP or UNIX socket address for Tendermint to listen on for
 	// connections from an external PrivValidator process
@@ -261,7 +262,7 @@ func DefaultBaseConfig() BaseConfig {
 	return BaseConfig{
 		GenesisDir:         defaultGenesisDir,
 		PrivValidatorKey:   defaultPrivValKeyPath,
-		PrivValidatorState: defaultPrivValStatePath,
+		PrivValidatorStateDir: defaultPrivValStateDir,
 		NodeKey:            defaultNodeKeyPath,
 		Moniker:            defaultMoniker,
 		ProxyApp:           "tcp://127.0.0.1:26658",
@@ -338,8 +339,13 @@ func (cfg BaseConfig) PrivValidatorKeyFile() string {
 }
 
 // PrivValidatorFile returns the full path to the priv_validator_state.json file
-func (cfg BaseConfig) PrivValidatorStateFile() string {
-	return rootify(cfg.PrivValidatorState, cfg.RootDir)
+func (cfg BaseConfig) PrivValidatorStateFile(chainID string) string {
+	pvDir := rootify(cfg.PrivValidatorStateDir, cfg.RootDir)
+	err := os.MkdirAll(pvDir, os.ModePerm)
+	if err != nil {
+		panic("Failed to create directory for privValidator state files!")
+	}
+	return(pvDir + "/" + chainID + ".json")
 }
 
 // NodeKeyFile returns the full path to the node_key.json file
