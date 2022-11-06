@@ -102,6 +102,7 @@ message Vote {
   bytes validator_address = 6;
   int32 validator_index   = 7;
   bytes signature         = 8;
+  string chain_id         = 9 [(gogoproto.customname) = "ChainID"];
 }
 
 // Commit contains the evidence that a block was committed by a set of validators.
@@ -110,6 +111,7 @@ message Commit {
   int32                         round      = 2;
   BlockID                       block_id   = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "BlockID"];
   repeated CommitSig            signatures = 4 [(gogoproto.nullable) = false];
+  string                        chain_id   = 5 [(gogoproto.customname) = "ChainID"];
 }
 
 // CommitSig is a part of the Vote included in a Commit.
@@ -119,6 +121,7 @@ message CommitSig {
   google.protobuf.Timestamp timestamp         = 3
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes signature = 4;
+  string chain_id = 5 [(gogoproto.customname) = "ChainID"];
 }
 
 message Proposal {
@@ -130,6 +133,7 @@ message Proposal {
   google.protobuf.Timestamp timestamp = 6
       [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
   bytes signature = 7;
+  string chain_id = 8 [(gogoproto.customname) = "ChainID"];
 }
 
 message SignedHeader {
