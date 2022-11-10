@@ -670,7 +670,7 @@ func DefaultP2PConfig() *P2PConfig {
 		ExternalAddress:              "",
 		UPNP:                         false,
 		AddrBook:                     defaultAddrBookPath,
-		AddrBookStrict:               true,
+		AddrBookStrict:               false,
 		MaxNumInboundPeers:           40,
 		MaxNumOutboundPeers:          10,
 		PersistentPeersMaxDialPeriod: 0 * time.Second,
