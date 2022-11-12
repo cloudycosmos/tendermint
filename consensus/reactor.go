@@ -320,6 +320,7 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 				Type:    msg.Type,
 				BlockID: msg.BlockID,
 				Votes:   ourVotes,
+				ChainID: msg.ChainID,
 			}))
 		default:
 			conR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
@@ -477,6 +478,7 @@ func (conR *Reactor) broadcastNewValidBlockMessage(rs *cstypes.RoundState) {
 		BlockPartSetHeader: rs.ProposalBlockParts.Header(),
 		BlockParts:         rs.ProposalBlockParts.BitArray(),
 		IsCommit:           rs.Step == cstypes.RoundStepCommit,
+		ChainID:            rs.ChainID,
 	}
 	conR.Switch.Broadcast(StateChannel, MustEncode(csMsg))
 }
@@ -488,6 +490,7 @@ func (conR *Reactor) broadcastHasVoteMessage(vote *types.Vote) {
 		Round:  vote.Round,
 		Type:   vote.Type,
 		Index:  vote.ValidatorIndex,
+		ChainID: vote.ChainID,
 	}
 	conR.Switch.Broadcast(StateChannel, MustEncode(msg))
 	/*
@@ -582,6 +585,7 @@ OUTER_LOOP:
 					Height: rs.Height, // This tells peer that this part applies to us.
 					Round:  rs.Round,  // This tells peer that this part applies to us.
 					Part:   part,
+					ChainID: chainID,
 				}
 				logger.Debug("Sending block part", "height", prs.Height, "round", prs.Round)
 				if peer.Send(DataChannel, MustEncode(msg)) {
@@ -631,7 +635,7 @@ OUTER_LOOP:
 		if rs.Proposal != nil && !prs.Proposal {
 			// Proposal: share the proposal metadata with peer.
 			{
-				msg := &ProposalMessage{Proposal: rs.Proposal}
+				msg := &ProposalMessage{Proposal: rs.Proposal, ChainID: chainID}
 				logger.Debug("Sending proposal", "height", prs.Height, "round", prs.Round)
 				if peer.Send(DataChannel, MustEncode(msg)) {
 					// NOTE[ZM]: A peer might have received different proposal msg so this Proposal msg will be rejected!
@@ -647,6 +651,7 @@ OUTER_LOOP:
 					Height:           rs.Height,
 					ProposalPOLRound: rs.Proposal.POLRound,
 					ProposalPOL:      rs.Votes.Prevotes(rs.Proposal.POLRound).BitArray(),
+					ChainID:          chainID,
 				}
 				logger.Debug("Sending POL", "height", prs.Height, "round", prs.Round)
 				peer.Send(DataChannel, MustEncode(msg))
@@ -691,6 +696,7 @@ func (conR *Reactor) gossipDataForCatchup(logger log.Logger, rs *cstypes.RoundSt
 			Height: prs.Height, // Not our height, so it doesn't matter.
 			Round:  prs.Round,  // Not our height, so it doesn't matter.
 			Part:   part,
+			ChainID: chainID,
 		}
 		logger.Debug("Sending block part for catchup", "round", prs.Round, "index", index)
 		if peer.Send(DataChannel, MustEncode(msg)) {
@@ -875,6 +881,7 @@ OUTER_LOOP:
 						Round:   prs.Round,
 						Type:    tmproto.PrevoteType,
 						BlockID: maj23,
+						ChainID: chainID,
 					}))
 					time.Sleep(conS.config.PeerQueryMaj23SleepDuration)
 				}
@@ -892,6 +899,7 @@ OUTER_LOOP:
 						Round:   prs.Round,
 						Type:    tmproto.PrecommitType,
 						BlockID: maj23,
+						ChainID: chainID,
 					}))
 					time.Sleep(conS.config.PeerQueryMaj23SleepDuration)
 				}
@@ -909,6 +917,7 @@ OUTER_LOOP:
 						Round:   prs.ProposalPOLRound,
 						Type:    tmproto.PrevoteType,
 						BlockID: maj23,
+						ChainID: chainID,
 					}))
 					time.Sleep(conS.config.PeerQueryMaj23SleepDuration)
 				}
@@ -929,6 +938,7 @@ OUTER_LOOP:
 						Round:   commit.Round,
 						Type:    tmproto.PrecommitType,
 						BlockID: commit.BlockID,
+						ChainID: chainID,
 					}))
 					time.Sleep(conS.config.PeerQueryMaj23SleepDuration)
 				}
