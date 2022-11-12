@@ -1613,6 +1613,10 @@ func (m *NewRoundStepMessage) ValidateBasic() error {
 		return errors.New("invalid LastCommitRound (cannot be < -1)")
 	}
 
+	if len(m.ChainID) == 0 {
+		return errors.New("empty chain-id")
+	}
+
 	return nil
 }
 
@@ -1835,12 +1839,15 @@ func (m *HasVoteMessage) ValidateBasic() error {
 	if m.Index < 0 {
 		return errors.New("negative Index")
 	}
+	if len(m.ChainID) == 0 {
+		return errors.New("empty chain-id")
+	}
 	return nil
 }
 
 // String returns a string representation.
 func (m *HasVoteMessage) String() string {
-	return fmt.Sprintf("[HasVote VI:%v V:{%v/%02d/%v}]", m.Index, m.Height, m.Round, m.Type)
+	return fmt.Sprintf("[HasVote VI:%v V:{%v/%02d/%v/%v}]", m.Index, m.Height, m.Round, m.Type, m.ChainID)
 }
 
 // GetChainID return the ChainID
