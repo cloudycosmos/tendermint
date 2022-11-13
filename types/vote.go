@@ -243,6 +243,7 @@ func VoteFromProto(pv *tmproto.Vote) (*Vote, error) {
 	vote.ValidatorAddress = pv.ValidatorAddress
 	vote.ValidatorIndex = pv.ValidatorIndex
 	vote.Signature = pv.Signature
+	vote.ChainID = pv.ChainID
 
 	return vote, vote.ValidateBasic()
 }

@@ -47,6 +47,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					BlockPartSetHeader: pbPartSetHeader,
 					BlockParts:         pbBits,
 					IsCommit:           msg.IsCommit,
+					ChainID:            msg.ChainID,
 				},
 			},
 		}
@@ -67,6 +68,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					Height:           msg.Height,
 					ProposalPolRound: msg.ProposalPOLRound,
 					ProposalPol:      *pbBits,
+					ChainID:          msg.ChainID,
 				},
 			},
 		}
@@ -81,6 +83,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					Height: msg.Height,
 					Round:  msg.Round,
 					Part:   *parts,
+					ChainID: msg.ChainID,
 				},
 			},
 		}
@@ -101,6 +104,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					Round:  msg.Round,
 					Type:   msg.Type,
 					Index:  msg.Index,
+					ChainID: msg.ChainID,
 				},
 			},
 		}
@@ -113,6 +117,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					Round:   msg.Round,
 					Type:    msg.Type,
 					BlockID: bi,
+					ChainID: msg.ChainID,
 				},
 			},
 		}
@@ -126,6 +131,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 				Round:   msg.Round,
 				Type:    msg.Type,
 				BlockID: bi,
+				ChainID: msg.ChainID,
 			},
 		}
 
@@ -164,6 +170,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Step:                  cstypes.RoundStepType(rs),
 			SecondsSinceStartTime: msg.NewRoundStep.SecondsSinceStartTime,
 			LastCommitRound:       msg.NewRoundStep.LastCommitRound,
+			ChainID:               msg.NewRoundStep.ChainID,
 		}
 	case *tmcons.Message_NewValidBlock:
 		pbPartSetHeader, err := types.PartSetHeaderFromProto(&msg.NewValidBlock.BlockPartSetHeader)
@@ -180,6 +187,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			BlockPartSetHeader: *pbPartSetHeader,
 			BlockParts:         pbBits,
 			IsCommit:           msg.NewValidBlock.IsCommit,
+			ChainID:            msg.NewValidBlock.ChainID,
 		}
 	case *tmcons.Message_Proposal:
 		pbP, err := types.ProposalFromProto(&msg.Proposal.Proposal)
@@ -197,6 +205,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Height:           msg.ProposalPol.Height,
 			ProposalPOLRound: msg.ProposalPol.ProposalPolRound,
 			ProposalPOL:      pbBits,
+			ChainID:          msg.ProposalPol.ChainID,
 		}
 	case *tmcons.Message_BlockPart:
 		parts, err := types.PartFromProto(&msg.BlockPart.Part)
@@ -207,6 +216,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Height: msg.BlockPart.Height,
 			Round:  msg.BlockPart.Round,
 			Part:   parts,
+			ChainID: msg.BlockPart.ChainID,
 		}
 	case *tmcons.Message_Vote:
 		vote, err := types.VoteFromProto(msg.Vote.Vote)
@@ -223,6 +233,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Round:  msg.HasVote.Round,
 			Type:   msg.HasVote.Type,
 			Index:  msg.HasVote.Index,
+			ChainID: msg.HasVote.ChainID,
 		}
 	case *tmcons.Message_VoteSetMaj23:
 		bi, err := types.BlockIDFromProto(&msg.VoteSetMaj23.BlockID)
