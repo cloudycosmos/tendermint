@@ -5,12 +5,16 @@ import (
 	"math"
 	"sync"
 	"time"
+	"encoding/json"
 
 	"github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/cmap"
 	"github.com/tendermint/tendermint/libs/rand"
 	"github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/p2p/conn"
+	"github.com/tendermint/tendermint/proxy"
+	abci "github.com/tendermint/tendermint/abci/types"
+
 )
 
 const (
@@ -90,6 +94,13 @@ type Switch struct {
 	rng *rand.Rand // seed for randomizing dial times and orders
 
 	metrics *Metrics
+
+	// for on-chain-peer-whitelist feature
+	isFilterPeers             bool
+	peerWhitelistCacheTimeout time.Duration
+	connQuery                 proxy.AppConnQuery
+	peerWhitelist             []string
+
 }
 
 // NetAddress returns the address the switch is listening on.
@@ -216,6 +227,48 @@ func (sw *Switch) SetNodeKey(nodeKey *NodeKey) {
 	sw.nodeKey = nodeKey
 }
 
+// PollPeerWhitelist polls the whitelist continuously
+func (sw *Switch) PollPeerWhitelist() {
+	ticker := time.NewTicker(sw.peerWhitelistCacheTimeout)
+	defer ticker.Stop()
+
+	for ; true ; <-ticker.C {
+		res, err := sw.connQuery.QuerySync(abci.RequestQuery{
+			Path: fmt.Sprintf("/custom/peerwhitelist/list_whitelist"),
+		})
+		if err != nil {
+			sw.Logger.Error("failed to retrive peer whitelist")
+			continue
+		}
+		if res.IsErr() {
+			sw.Logger.Error("error querying abci app", "returned", res)
+			continue
+		}
+
+		json.Unmarshal(res.Value, &(sw.peerWhitelist))
+
+		peerList := sw.peers.List()
+		for _, peer := range peerList {
+			// Persistent peers are implicitly on the whitelist
+			if sw.myIsPeerPersistent(peer.SocketAddr()) {
+				continue
+			}
+
+			peerID := (string)(peer.ID())
+			found := false
+			for _, id := range sw.peerWhitelist {
+				if peerID == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				sw.StopPeerGracefully(peer)
+			}
+		}
+	}
+}
+
 //---------------------------------------------------------------------
 // Service start/stop
 
@@ -231,6 +284,10 @@ func (sw *Switch) OnStart() error {
 
 	// Start accepting Peers.
 	go sw.acceptRoutine()
+
+	if sw.isFilterPeers {
+		go sw.PollPeerWhitelist()
+	}
 
 	return nil
 }
@@ -759,12 +816,53 @@ func (sw *Switch) addOutboundPeerWithConfig(
 	return nil
 }
 
+func (sw *Switch) myIsPeerPersistent(na *NetAddress) bool {
+	for _, pa := range sw.persistentPeersAddrs {
+		if pa.ID == na.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (sw *Switch) SetPeerFilterConfiguation(isFilterPeers bool, whitelistCacheTimeout time.Duration) {
+	sw.isFilterPeers = isFilterPeers
+	sw.peerWhitelistCacheTimeout = whitelistCacheTimeout
+}
+
+func (sw *Switch) SetQueryConnection(connQuery proxy.AppConnQuery) {
+	sw.connQuery = connQuery
+}
+
 func (sw *Switch) filterPeer(p Peer) error {
 	// Avoid duplicate
 	if sw.peers.Has(p.ID()) {
 		return ErrRejected{id: p.ID(), isDuplicate: true}
 	}
 
+	// Persistent peers are implicitly on the whitelist
+	if sw.myIsPeerPersistent(p.SocketAddr()) {
+		return nil
+	}
+
+	if sw.isFilterPeers {
+		// on-chain-peer-whitelist feature
+		peerID := (string)(p.ID())
+		found := false
+		for _, id := range sw.peerWhitelist {
+			if peerID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("peer %v is not on whitelist", peerID)
+		}
+	}
+
+	// since we start to use the on-chain-peer-whitelist, the
+	// traditional peerFilters way is not needed
+/*
 	errc := make(chan error, len(sw.peerFilters))
 
 	for _, f := range sw.peerFilters {
@@ -783,6 +881,7 @@ func (sw *Switch) filterPeer(p Peer) error {
 			return ErrFilterTimeout{}
 		}
 	}
+*/
 
 	return nil
 }

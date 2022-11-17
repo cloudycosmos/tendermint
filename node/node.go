@@ -825,6 +825,9 @@ func NewNode(config *cfg.Config,
 		return nil, fmt.Errorf("could not add peer ids from unconditional_peer_ids field: %w", err)
 	}
 
+	sw.SetPeerFilterConfiguation(config.FilterPeers, config.P2P.PeerWhitelistCacheTimeout)
+	sw.SetQueryConnection(proxyApp.Query())
+
 	addrBook, err := createAddrBookAndSetOnSwitch(config, sw, p2pLogger, nodeKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not create addrbook: %w", err)
