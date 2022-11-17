@@ -1,0 +1,12 @@
+The feature of on-chain-peer-whitelist is implemented in branch "on-chain-peer-whitelist".
+
+We had configuration file based peer whitelist feature implemented in the ethdbchain application,
+no any code changes are needed in tendermint. That feature is node specific, not chain specific.
+
+I'm implementing the multi-ledger feature in branch "ethan", which is based on "main" branch.
+The on-chain-peer-whitelist feature is not compatible with the multi-ledger feature, since we
+don't know which chain to get the whitelist from.
+
+So we need to be sure not to rebase the "main" branch on "on-chain-peer-whitelist" branch.
+
+To build the ocpw feature, the projects ethdbchain and cosmos-sdk need to be on their "main" branch".
