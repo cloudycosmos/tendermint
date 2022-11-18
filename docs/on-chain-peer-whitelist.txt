@@ -9,4 +9,4 @@ don't know which chain to get the whitelist from.
 
 So we need to be sure not to rebase the "main" branch on "on-chain-peer-whitelist" branch.
 
-To build the ocpw feature, the projects ethdbchain and cosmos-sdk need to be on their "main" branch".
+To build the ocpw feature, the projects ethdbchain and tendermint need to be on their "on-chain-peeer-whitelist" branch".
