@@ -337,6 +337,9 @@ allow_duplicate_ip = {{ .P2P.AllowDuplicateIP }}
 handshake_timeout = "{{ .P2P.HandshakeTimeout }}"
 dial_timeout = "{{ .P2P.DialTimeout }}"
 
+# Peer whitelist configuration.
+peer_whitelist_cache_timeout = "{{ .P2P.PeerWhitelistCacheTimeout }}"
+
 #######################################################
 ###          Mempool Configuration Option          ###
 #######################################################

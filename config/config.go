@@ -576,6 +576,9 @@ type P2PConfig struct { //nolint: maligned
 	HandshakeTimeout time.Duration `mapstructure:"handshake_timeout"`
 	DialTimeout      time.Duration `mapstructure:"dial_timeout"`
 
+	// Peer whitelist configuration.
+	PeerWhitelistCacheTimeout time.Duration `mapstructure:"peer_whitelist_cache_timeout"`
+
 	// Testing params.
 	// Force dial to fail
 	TestDialFail bool `mapstructure:"test_dial_fail"`
@@ -604,6 +607,7 @@ func DefaultP2PConfig() *P2PConfig {
 		AllowDuplicateIP:             false,
 		HandshakeTimeout:             20 * time.Second,
 		DialTimeout:                  3 * time.Second,
+		PeerWhitelistCacheTimeout:    15 * time.Second,
 		TestDialFail:                 false,
 		TestFuzz:                     false,
 		TestFuzzConfig:               DefaultFuzzConnConfig(),
