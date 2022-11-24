@@ -51,7 +51,7 @@ type BlockchainReactor struct {
 	p2p.BaseReactor
 
 	// immutable
-	initialStateMap map[string]sm.State
+	initialStateMap map[string]*sm.State
 
 	blockExecMap map[string]*sm.BlockExecutor
 	storeMap     map[string]*store.BlockStore
@@ -63,7 +63,7 @@ type BlockchainReactor struct {
 }
 
 // NewBlockchainReactor returns new reactor instance.
-func NewBlockchainReactor(stateMap map[string]sm.State, blockExecMap map[string]*sm.BlockExecutor, storeMap map[string]*store.BlockStore,
+func NewBlockchainReactor(stateMap map[string]*sm.State, blockExecMap map[string]*sm.BlockExecutor, storeMap map[string]*store.BlockStore,
 	fastSyncMap map[string]bool) *BlockchainReactor {
 
 	requestsCh := make(chan BlockRequest, maxTotalRequesters)
@@ -135,7 +135,9 @@ func (bcR *BlockchainReactor) OnStart() error {
 // SwitchToFastSync is called by the state sync reactor when switching to fast sync.
 func (bcR *BlockchainReactor) SwitchToFastSync(state sm.State, chainID string) error {
 	bcR.fastSyncMap[chainID] = true
-	bcR.initialStateMap[chainID] = state
+	bcR.initialStateMap[chainID] = &state    // YITODO: need review. not sure if it's
+                                                 //         better to change the parameter
+                                                 //         to *sm.State
 
 	pool, found := bcR.poolMap[chainID]; if !found {
 		return fmt.Errorf("failed to retrieve pool for chainID %s", chainID)
@@ -353,7 +355,7 @@ func (bcR *BlockchainReactor) poolRoutine(stateSynced bool) {
 	}()
 
 	for chainID, state := range bcR.initialStateMap {
-		go bcR.poolRoutineRaw(chainID, state, stateSynced)
+		go bcR.poolRoutineRaw(chainID, *state, stateSynced)
 	}
 }
 

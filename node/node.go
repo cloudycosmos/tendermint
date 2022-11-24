@@ -511,11 +511,11 @@ func createBlockchainReactor(config *cfg.Config,
 	fastSyncMap map[string]bool,
 	logger log.Logger) (bcReactor p2p.Reactor, err error) {
 
-	stateCopyMap := make(map[string]sm.State)
+	stateCopyMap := make(map[string]*sm.State)
 
 	for chainID, state := range stateMap {
 		newState := state.Copy()
-		stateCopyMap[chainID] = newState
+		stateCopyMap[chainID] = &newState
 	}
 
 	switch config.FastSync.Version {
