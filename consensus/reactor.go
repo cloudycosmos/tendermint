@@ -1050,7 +1050,7 @@ type PeerState struct {
 	logger log.Logger
 
 	mtx      sync.Mutex    // NOTE: Modify below using setters, never directly.
-	PRSMap   map[string]cstypes.PeerRoundState `json:"round_state"` // Exposed.
+	PRSMap   map[string]*cstypes.PeerRoundState `json:"round_state"` // Exposed.
 	Stats    *peerStateStats                   `json:"stats"`       // Exposed.
 }
 
@@ -1067,9 +1067,9 @@ func (pss peerStateStats) String() string {
 
 // NewPeerState returns a new PeerState for the given Peer
 func NewPeerState(peer p2p.Peer, chainIDs []string) *PeerState {
-	PRSMap := make(map[string]cstypes.PeerRoundState)
+	PRSMap := make(map[string]*cstypes.PeerRoundState)
 	for _, chainID := range chainIDs {
-		PRSMap[chainID] = cstypes.PeerRoundState{
+		PRSMap[chainID] = &cstypes.PeerRoundState{
 			Round:              -1,
 			ProposalPOLRound:   -1,
 			LastCommitRound:    -1,
@@ -1098,8 +1098,8 @@ func (ps *PeerState) GetRoundState(chainID string) *cstypes.PeerRoundState {
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 
-	prs := ps.PRSMap[chainID] // copy
-	return &prs
+	prs := ps.PRSMap[chainID]
+	return prs
 }
 
 // ToJSON returns a json of PeerState.
