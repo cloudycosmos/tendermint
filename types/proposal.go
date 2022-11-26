@@ -138,6 +138,7 @@ func (p *Proposal) ToProto() *tmproto.Proposal {
 	pb.PolRound = p.POLRound
 	pb.Timestamp = p.Timestamp
 	pb.Signature = p.Signature
+	pb.ChainID = p.ChainID
 
 	return pb
 }
@@ -163,6 +164,7 @@ func ProposalFromProto(pp *tmproto.Proposal) (*Proposal, error) {
 	p.POLRound = pp.PolRound
 	p.Timestamp = pp.Timestamp
 	p.Signature = pp.Signature
+	p.ChainID = pp.ChainID
 
 	return p, p.ValidateBasic()
 }
