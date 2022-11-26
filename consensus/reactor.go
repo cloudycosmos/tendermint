@@ -635,7 +635,7 @@ OUTER_LOOP:
 		if rs.Proposal != nil && !prs.Proposal {
 			// Proposal: share the proposal metadata with peer.
 			{
-				msg := &ProposalMessage{Proposal: rs.Proposal, ChainID: chainID}
+				msg := &ProposalMessage{Proposal: rs.Proposal}
 				logger.Debug("Sending proposal", "height", prs.Height, "round", prs.Round)
 				if peer.Send(DataChannel, MustEncode(msg)) {
 					// NOTE[ZM]: A peer might have received different proposal msg so this Proposal msg will be rejected!
@@ -1703,7 +1703,6 @@ func (m *NewValidBlockMessage) GetChainID() string {
 // ProposalMessage is sent when a new block is proposed.
 type ProposalMessage struct {
 	Proposal *types.Proposal
-	ChainID  string
 }
 
 // ValidateBasic performs basic validation.
@@ -1718,7 +1717,7 @@ func (m *ProposalMessage) String() string {
 
 // GetChainID return the ChainID
 func (m *ProposalMessage) GetChainID() string {
-	return m.ChainID
+	return m.Proposal.ChainID
 }
 
 //-------------------------------------

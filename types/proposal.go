@@ -30,17 +30,20 @@ type Proposal struct {
 	BlockID   BlockID   `json:"block_id"`
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
+
+	ChainID   string    `json:"chain_id"` // added by Yi
 }
 
 // NewProposal returns a new Proposal.
 // If there is no POLRound, polRound should be -1.
-func NewProposal(height int64, round int32, polRound int32, blockID BlockID) *Proposal {
+func NewProposal(height int64, round int32, polRound int32, blockID BlockID, chainID string) *Proposal {
 	return &Proposal{
 		Type:      tmproto.ProposalType,
 		Height:    height,
 		Round:     round,
 		BlockID:   blockID,
 		POLRound:  polRound,
+		ChainID:   chainID,
 		Timestamp: tmtime.Now(),
 	}
 }
@@ -75,6 +78,10 @@ func (p *Proposal) ValidateBasic() error {
 
 	if len(p.Signature) > MaxSignatureSize {
 		return fmt.Errorf("signature is too big (max: %d)", MaxSignatureSize)
+	}
+
+	if len(p.ChainID) == 0 {
+		return errors.New("chain_id is missing")
 	}
 	return nil
 }
