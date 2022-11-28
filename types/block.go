@@ -597,6 +597,7 @@ type CommitSig struct {
 	ValidatorAddress Address     `json:"validator_address"`
 	Timestamp        time.Time   `json:"timestamp"`
 	Signature        []byte      `json:"signature"`
+	ChainID          string      `json:"chain_id"`
 }
 
 // NewCommitSigForBlock returns new CommitSig with BlockIDFlagCommit.
@@ -685,6 +686,9 @@ func (cs CommitSig) ValidateBasic() error {
 		if len(cs.Signature) != 0 {
 			return errors.New("signature is present")
 		}
+		if len(cs.ChainID) != 0 {
+			return errors.New("chain_id is present")
+		}
 	default:
 		if len(cs.ValidatorAddress) != crypto.AddressSize {
 			return fmt.Errorf("expected ValidatorAddress size to be %d bytes, got %d bytes",
@@ -698,6 +702,9 @@ func (cs CommitSig) ValidateBasic() error {
 		}
 		if len(cs.Signature) > MaxSignatureSize {
 			return fmt.Errorf("signature is too big (max: %d)", MaxSignatureSize)
+		}
+		if len(cs.ChainID) == 0 {
+			return errors.New("chain_id is missing")
 		}
 	}
 
@@ -715,6 +722,7 @@ func (cs *CommitSig) ToProto() *tmproto.CommitSig {
 		ValidatorAddress: cs.ValidatorAddress,
 		Timestamp:        cs.Timestamp,
 		Signature:        cs.Signature,
+		ChainID:          cs.ChainID,
 	}
 }
 
@@ -726,6 +734,7 @@ func (cs *CommitSig) FromProto(csp tmproto.CommitSig) error {
 	cs.ValidatorAddress = csp.ValidatorAddress
 	cs.Timestamp = csp.Timestamp
 	cs.Signature = csp.Signature
+	cs.ChainID   = csp.ChainID
 
 	return cs.ValidateBasic()
 }
@@ -751,16 +760,17 @@ type Commit struct {
 	bitArray *bits.BitArray
 
 	// Added by YI
-	chainID  string
+	ChainID  string
 }
 
 // NewCommit returns a new Commit.
-func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSig) *Commit {
+func NewCommit(height int64, round int32, blockID BlockID, commitSigs []CommitSig, chainID string) *Commit {
 	return &Commit{
 		Height:     height,
 		Round:      round,
 		BlockID:    blockID,
 		Signatures: commitSigs,
+		ChainID:    chainID,
 	}
 }
 
@@ -783,7 +793,7 @@ func CommitToVoteSet(chainID string, commit *Commit, vals *ValidatorSet) *VoteSe
 
 // Added by Yi to make Commit of type VoteSetReader
 func (commit *Commit) GetChainID() string {
-	return commit.chainID
+	return commit.ChainID
 }
 
 // GetVote converts the CommitSig for the given valIdx to a Vote.
@@ -800,6 +810,7 @@ func (commit *Commit) GetVote(valIdx int32) *Vote {
 		ValidatorAddress: commitSig.ValidatorAddress,
 		ValidatorIndex:   valIdx,
 		Signature:        commitSig.Signature,
+		ChainID:          commitSig.ChainID,
 	}
 }
 
@@ -895,6 +906,9 @@ func (commit *Commit) ValidateBasic() error {
 			}
 		}
 	}
+	if len(commit.ChainID) == 0 {
+		return errors.New("empty ChainID")
+	}
 	return nil
 }
 
@@ -959,6 +973,7 @@ func (commit *Commit) ToProto() *tmproto.Commit {
 	c.Height = commit.Height
 	c.Round = commit.Round
 	c.BlockID = commit.BlockID.ToProto()
+	c.ChainID = commit.ChainID
 
 	return c
 }
@@ -990,6 +1005,7 @@ func CommitFromProto(cp *tmproto.Commit) (*Commit, error) {
 	commit.Height = cp.Height
 	commit.Round = cp.Round
 	commit.BlockID = *bi
+	commit.ChainID = cp.ChainID
 
 	return commit, commit.ValidateBasic()
 }

@@ -80,6 +80,7 @@ func (vote *Vote) CommitSig() CommitSig {
 		ValidatorAddress: vote.ValidatorAddress,
 		Timestamp:        vote.Timestamp,
 		Signature:        vote.Signature,
+		ChainID:          vote.ChainID,
 	}
 }
 
