@@ -204,7 +204,7 @@ func (c *Client) compareNewHeaderWithWitness(ctx context.Context, errc chan erro
 
 // sendEvidence sends evidence to a provider on a best effort basis.
 func (c *Client) sendEvidence(ctx context.Context, ev *types.LightClientAttackEvidence, receiver provider.Provider) {
-	err := receiver.ReportEvidence(ctx, ev)
+	err := receiver.ReportEvidence(ctx, c.chainID, ev)
 	if err != nil {
 		c.logger.Error("Failed to report evidence to provider", "ev", ev, "provider", receiver)
 	}

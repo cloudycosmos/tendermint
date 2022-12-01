@@ -33,12 +33,13 @@ func DefaultWaitStrategy(delta int64) (abort error) {
 // If waiter is nil, we use DefaultWaitStrategy, but you can also
 // provide your own implementation
 func WaitForHeight(c StatusClient, h int64, waiter Waiter) error {
+	chainID := "fake-chain-id"  // YITODO: we need a better way to get the chainID
 	if waiter == nil {
 		waiter = DefaultWaitStrategy
 	}
 	delta := int64(1)
 	for delta > 0 {
-		s, err := c.Status(context.Background())
+		s, err := c.Status(context.Background(), chainID)
 		if err != nil {
 			return err
 		}

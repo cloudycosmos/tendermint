@@ -115,8 +115,8 @@ func (c *Client) OnStop() {
 	}
 }
 
-func (c *Client) Status(ctx context.Context) (*ctypes.ResultStatus, error) {
-	return c.next.Status(ctx)
+func (c *Client) Status(ctx context.Context, chainId string) (*ctypes.ResultStatus, error) {
+	return c.next.Status(ctx, chainId)
 }
 
 func (c *Client) ABCIInfo(ctx context.Context) (*ctypes.ResultABCIInfo, error) {
@@ -124,18 +124,18 @@ func (c *Client) ABCIInfo(ctx context.Context) (*ctypes.ResultABCIInfo, error) {
 }
 
 // ABCIQuery requests proof by default.
-func (c *Client) ABCIQuery(ctx context.Context, path string, data tmbytes.HexBytes) (*ctypes.ResultABCIQuery, error) {
-	return c.ABCIQueryWithOptions(ctx, path, data, rpcclient.DefaultABCIQueryOptions)
+func (c *Client) ABCIQuery(ctx context.Context, chainId string, path string, data tmbytes.HexBytes) (*ctypes.ResultABCIQuery, error) {
+	return c.ABCIQueryWithOptions(ctx, chainId, path, data, rpcclient.DefaultABCIQueryOptions)
 }
 
 // ABCIQueryWithOptions returns an error if opts.Prove is false.
-func (c *Client) ABCIQueryWithOptions(ctx context.Context, path string, data tmbytes.HexBytes,
+func (c *Client) ABCIQueryWithOptions(ctx context.Context, chainId string, path string, data tmbytes.HexBytes,
 	opts rpcclient.ABCIQueryOptions) (*ctypes.ResultABCIQuery, error) {
 
 	// always request the proof
 	opts.Prove = true
 
-	res, err := c.next.ABCIQueryWithOptions(ctx, path, data, opts)
+	res, err := c.next.ABCIQueryWithOptions(ctx, chainId, path, data, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (c *Client) ABCIQueryWithOptions(ctx context.Context, path string, data tmb
 	// Update the light client if we're behind.
 	// NOTE: AppHash for height H is in header H+1.
 	nextHeight := resp.Height + 1
-	l, err := c.updateLightClientIfNeededTo(ctx, &nextHeight)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, &nextHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -202,12 +202,12 @@ func (c *Client) BroadcastTxSync(ctx context.Context, tx types.Tx) (*ctypes.Resu
 	return c.next.BroadcastTxSync(ctx, tx)
 }
 
-func (c *Client) UnconfirmedTxs(ctx context.Context, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
-	return c.next.UnconfirmedTxs(ctx, limit)
+func (c *Client) UnconfirmedTxs(ctx context.Context, chainId string, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
+	return c.next.UnconfirmedTxs(ctx, chainId, limit)
 }
 
-func (c *Client) NumUnconfirmedTxs(ctx context.Context) (*ctypes.ResultUnconfirmedTxs, error) {
-	return c.next.NumUnconfirmedTxs(ctx)
+func (c *Client) NumUnconfirmedTxs(ctx context.Context, chainId string) (*ctypes.ResultUnconfirmedTxs, error) {
+	return c.next.NumUnconfirmedTxs(ctx, chainId)
 }
 
 func (c *Client) CheckTx(ctx context.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
@@ -218,16 +218,16 @@ func (c *Client) NetInfo(ctx context.Context) (*ctypes.ResultNetInfo, error) {
 	return c.next.NetInfo(ctx)
 }
 
-func (c *Client) DumpConsensusState(ctx context.Context) (*ctypes.ResultDumpConsensusState, error) {
-	return c.next.DumpConsensusState(ctx)
+func (c *Client) DumpConsensusState(ctx context.Context, chainId string) (*ctypes.ResultDumpConsensusState, error) {
+	return c.next.DumpConsensusState(ctx, chainId)
 }
 
-func (c *Client) ConsensusState(ctx context.Context) (*ctypes.ResultConsensusState, error) {
-	return c.next.ConsensusState(ctx)
+func (c *Client) ConsensusState(ctx context.Context, chainId string) (*ctypes.ResultConsensusState, error) {
+	return c.next.ConsensusState(ctx, chainId)
 }
 
-func (c *Client) ConsensusParams(ctx context.Context, height *int64) (*ctypes.ResultConsensusParams, error) {
-	res, err := c.next.ConsensusParams(ctx, height)
+func (c *Client) ConsensusParams(ctx context.Context, chainId string, height *int64) (*ctypes.ResultConsensusParams, error) {
+	res, err := c.next.ConsensusParams(ctx, chainId, height)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (c *Client) ConsensusParams(ctx context.Context, height *int64) (*ctypes.Re
 	}
 
 	// Update the light client if we're behind.
-	l, err := c.updateLightClientIfNeededTo(ctx, &res.BlockHeight)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, &res.BlockHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +261,8 @@ func (c *Client) Health(ctx context.Context) (*ctypes.ResultHealth, error) {
 
 // BlockchainInfo calls rpcclient#BlockchainInfo and then verifies every header
 // returned.
-func (c *Client) BlockchainInfo(ctx context.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
-	res, err := c.next.BlockchainInfo(ctx, minHeight, maxHeight)
+func (c *Client) BlockchainInfo(ctx context.Context, chainId string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
+	res, err := c.next.BlockchainInfo(ctx, chainId, minHeight, maxHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func (c *Client) BlockchainInfo(ctx context.Context, minHeight, maxHeight int64)
 	// Update the light client if we're behind.
 	if len(res.BlockMetas) > 0 {
 		lastHeight := res.BlockMetas[len(res.BlockMetas)-1].Header.Height
-		if _, err := c.updateLightClientIfNeededTo(ctx, &lastHeight); err != nil {
+		if _, err := c.updateLightClientIfNeededTo(ctx, chainId, &lastHeight); err != nil {
 			return nil, err
 		}
 	}
@@ -300,17 +300,17 @@ func (c *Client) BlockchainInfo(ctx context.Context, minHeight, maxHeight int64)
 	return res, nil
 }
 
-func (c *Client) Genesis(ctx context.Context) (*ctypes.ResultGenesis, error) {
-	return c.next.Genesis(ctx)
+func (c *Client) Genesis(ctx context.Context, chainId string) (*ctypes.ResultGenesis, error) {
+	return c.next.Genesis(ctx, chainId)
 }
 
-func (c *Client) GenesisChunked(ctx context.Context, id uint) (*ctypes.ResultGenesisChunk, error) {
-	return c.next.GenesisChunked(ctx, id)
+func (c *Client) GenesisChunked(ctx context.Context, chainId string, id uint) (*ctypes.ResultGenesisChunk, error) {
+	return c.next.GenesisChunked(ctx, chainId, id)
 }
 
 // Block calls rpcclient#Block and then verifies the result.
-func (c *Client) Block(ctx context.Context, height *int64) (*ctypes.ResultBlock, error) {
-	res, err := c.next.Block(ctx, height)
+func (c *Client) Block(ctx context.Context, chainId string, height *int64) (*ctypes.ResultBlock, error) {
+	res, err := c.next.Block(ctx, chainId, height)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (c *Client) Block(ctx context.Context, height *int64) (*ctypes.ResultBlock,
 	}
 
 	// Update the light client if we're behind.
-	l, err := c.updateLightClientIfNeededTo(ctx, &res.Block.Height)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, &res.Block.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +343,8 @@ func (c *Client) Block(ctx context.Context, height *int64) (*ctypes.ResultBlock,
 }
 
 // BlockByHash calls rpcclient#BlockByHash and then verifies the result.
-func (c *Client) BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBlock, error) {
-	res, err := c.next.BlockByHash(ctx, hash)
+func (c *Client) BlockByHash(ctx context.Context, chainId string, hash []byte) (*ctypes.ResultBlock, error) {
+	res, err := c.next.BlockByHash(ctx, chainId, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +362,7 @@ func (c *Client) BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBl
 	}
 
 	// Update the light client if we're behind.
-	l, err := c.updateLightClientIfNeededTo(ctx, &res.Block.Height)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, &res.Block.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -378,10 +378,10 @@ func (c *Client) BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBl
 
 // BlockResults returns the block results for the given height. If no height is
 // provided, the results of the block preceding the latest are returned.
-func (c *Client) BlockResults(ctx context.Context, height *int64) (*ctypes.ResultBlockResults, error) {
+func (c *Client) BlockResults(ctx context.Context, chainId string, height *int64) (*ctypes.ResultBlockResults, error) {
 	var h int64
 	if height == nil {
-		res, err := c.next.Status(ctx)
+		res, err := c.next.Status(ctx, chainId)
 		if err != nil {
 			return nil, fmt.Errorf("can't get latest height: %w", err)
 		}
@@ -392,7 +392,7 @@ func (c *Client) BlockResults(ctx context.Context, height *int64) (*ctypes.Resul
 		h = *height
 	}
 
-	res, err := c.next.BlockResults(ctx, &h)
+	res, err := c.next.BlockResults(ctx, chainId, &h)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ func (c *Client) BlockResults(ctx context.Context, height *int64) (*ctypes.Resul
 
 	// Update the light client if we're behind.
 	nextHeight := h + 1
-	trustedBlock, err := c.updateLightClientIfNeededTo(ctx, &nextHeight)
+	trustedBlock, err := c.updateLightClientIfNeededTo(ctx, chainId, &nextHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -440,10 +440,10 @@ func (c *Client) BlockResults(ctx context.Context, height *int64) (*ctypes.Resul
 	return res, nil
 }
 
-func (c *Client) Commit(ctx context.Context, height *int64) (*ctypes.ResultCommit, error) {
+func (c *Client) Commit(ctx context.Context, chainId string, height *int64) (*ctypes.ResultCommit, error) {
 	// Update the light client if we're behind and retrieve the light block at the requested height
 	// or at the latest height if no height is provided.
-	l, err := c.updateLightClientIfNeededTo(ctx, height)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, height)
 	if err != nil {
 		return nil, err
 	}
@@ -456,8 +456,8 @@ func (c *Client) Commit(ctx context.Context, height *int64) (*ctypes.ResultCommi
 
 // Tx calls rpcclient#Tx method and then verifies the proof if such was
 // requested.
-func (c *Client) Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
-	res, err := c.next.Tx(ctx, hash, prove)
+func (c *Client) Tx(ctx context.Context, chainId string, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+	res, err := c.next.Tx(ctx, chainId, hash, prove)
 	if err != nil || !prove {
 		return res, err
 	}
@@ -468,7 +468,7 @@ func (c *Client) Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.Resul
 	}
 
 	// Update the light client if we're behind.
-	l, err := c.updateLightClientIfNeededTo(ctx, &res.Height)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, &res.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -479,33 +479,36 @@ func (c *Client) Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.Resul
 
 func (c *Client) TxSearch(
 	ctx context.Context,
+	chainId string,
 	query string,
 	prove bool,
 	page, perPage *int,
 	orderBy string,
 ) (*ctypes.ResultTxSearch, error) {
-	return c.next.TxSearch(ctx, query, prove, page, perPage, orderBy)
+	return c.next.TxSearch(ctx, chainId, query, prove, page, perPage, orderBy)
 }
 
 func (c *Client) BlockSearch(
 	ctx context.Context,
+	chainId string,
 	query string,
 	page, perPage *int,
 	orderBy string,
 ) (*ctypes.ResultBlockSearch, error) {
-	return c.next.BlockSearch(ctx, query, page, perPage, orderBy)
+	return c.next.BlockSearch(ctx, chainId, query, page, perPage, orderBy)
 }
 
 // Validators fetches and verifies validators.
 func (c *Client) Validators(
 	ctx context.Context,
+	chainId string,
 	height *int64,
 	pagePtr, perPagePtr *int,
 ) (*ctypes.ResultValidators, error) {
 
 	// Update the light client if we're behind and retrieve the light block at the
 	// requested height or at the latest height if no height is provided.
-	l, err := c.updateLightClientIfNeededTo(ctx, height)
+	l, err := c.updateLightClientIfNeededTo(ctx, chainId, height)
 	if err != nil {
 		return nil, err
 	}
@@ -527,8 +530,8 @@ func (c *Client) Validators(
 		Total:       totalCount}, nil
 }
 
-func (c *Client) BroadcastEvidence(ctx context.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
-	return c.next.BroadcastEvidence(ctx, ev)
+func (c *Client) BroadcastEvidence(ctx context.Context, chainId string, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
+	return c.next.BroadcastEvidence(ctx, chainId, ev)
 }
 
 func (c *Client) Subscribe(ctx context.Context, subscriber, query string,
@@ -544,7 +547,7 @@ func (c *Client) UnsubscribeAll(ctx context.Context, subscriber string) error {
 	return c.next.UnsubscribeAll(ctx, subscriber)
 }
 
-func (c *Client) updateLightClientIfNeededTo(ctx context.Context, height *int64) (*types.LightBlock, error) {
+func (c *Client) updateLightClientIfNeededTo(ctx context.Context, chainId string, height *int64) (*types.LightBlock, error) {
 	var (
 		l   *types.LightBlock
 		err error

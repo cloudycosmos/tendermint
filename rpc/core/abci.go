@@ -12,6 +12,7 @@ import (
 // More: https://docs.tendermint.com/master/rpc/#/ABCI/abci_query
 func ABCIQuery(
 	ctx *rpctypes.Context,
+	chainId string,
 	path string,
 	data bytes.HexBytes,
 	height int64,
@@ -22,6 +23,7 @@ func ABCIQuery(
 		Data:   data,
 		Height: height,
 		Prove:  prove,
+		ChainID: chainId,
 	})
 	if err != nil {
 		return nil, err

@@ -167,6 +167,9 @@ func InitGenesisChunksRaw(chainID string, genDoc *types.GenesisDoc) error {
 			end = len(data)
 		}
 
+		if env.genChunksMap == nil {
+			env.genChunksMap = make(map[string][]string)
+		}
 		env.genChunksMap[chainID] = append(env.genChunksMap[chainID], base64.StdEncoding.EncodeToString(data[i:end]))
 	}
 

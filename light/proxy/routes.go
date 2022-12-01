@@ -21,20 +21,20 @@ func RPCRoutes(c *lrpc.Client) map[string]*rpcserver.RPCFunc {
 		"health":               rpcserver.NewRPCFunc(makeHealthFunc(c), ""),
 		"status":               rpcserver.NewRPCFunc(makeStatusFunc(c), ""),
 		"net_info":             rpcserver.NewRPCFunc(makeNetInfoFunc(c), ""),
-		"blockchain":           rpcserver.NewRPCFunc(makeBlockchainInfoFunc(c), "minHeight,maxHeight"),
-		"genesis":              rpcserver.NewRPCFunc(makeGenesisFunc(c), ""),
-		"genesis_chunked":      rpcserver.NewRPCFunc(makeGenesisChunkedFunc(c), ""),
-		"block":                rpcserver.NewRPCFunc(makeBlockFunc(c), "height"),
-		"block_by_hash":        rpcserver.NewRPCFunc(makeBlockByHashFunc(c), "hash"),
-		"block_results":        rpcserver.NewRPCFunc(makeBlockResultsFunc(c), "height"),
-		"commit":               rpcserver.NewRPCFunc(makeCommitFunc(c), "height"),
+		"blockchain":           rpcserver.NewRPCFunc(makeBlockchainInfoFunc(c), "chain_id,minHeight,maxHeight"),
+		"genesis":              rpcserver.NewRPCFunc(makeGenesisFunc(c), "chain_id"),
+		"genesis_chunked":      rpcserver.NewRPCFunc(makeGenesisChunkedFunc(c), "chain_id"),
+		"block":                rpcserver.NewRPCFunc(makeBlockFunc(c), "chain_id,height"),
+		"block_by_hash":        rpcserver.NewRPCFunc(makeBlockByHashFunc(c), "chain_id,hash"),
+		"block_results":        rpcserver.NewRPCFunc(makeBlockResultsFunc(c), "chain_id,height"),
+		"commit":               rpcserver.NewRPCFunc(makeCommitFunc(c), "chain_id,height"),
 		"tx":                   rpcserver.NewRPCFunc(makeTxFunc(c), "hash,prove"),
-		"tx_search":            rpcserver.NewRPCFunc(makeTxSearchFunc(c), "query,prove,page,per_page,order_by"),
-		"block_search":         rpcserver.NewRPCFunc(makeBlockSearchFunc(c), "query,page,per_page,order_by"),
-		"validators":           rpcserver.NewRPCFunc(makeValidatorsFunc(c), "height,page,per_page"),
-		"dump_consensus_state": rpcserver.NewRPCFunc(makeDumpConsensusStateFunc(c), ""),
-		"consensus_state":      rpcserver.NewRPCFunc(makeConsensusStateFunc(c), ""),
-		"consensus_params":     rpcserver.NewRPCFunc(makeConsensusParamsFunc(c), "height"),
+		"tx_search":            rpcserver.NewRPCFunc(makeTxSearchFunc(c), "chain_id,query,prove,page,per_page,order_by"),
+		"block_search":         rpcserver.NewRPCFunc(makeBlockSearchFunc(c), "chain_id,query,page,per_page,order_by"),
+		"validators":           rpcserver.NewRPCFunc(makeValidatorsFunc(c), "chain_id,height,page,per_page"),
+		"dump_consensus_state": rpcserver.NewRPCFunc(makeDumpConsensusStateFunc(c), "chain_id"),
+		"consensus_state":      rpcserver.NewRPCFunc(makeConsensusStateFunc(c), "chain_id"),
+		"consensus_params":     rpcserver.NewRPCFunc(makeConsensusParamsFunc(c), "chain_id,height"),
 		"unconfirmed_txs":      rpcserver.NewRPCFunc(makeUnconfirmedTxsFunc(c), "limit"),
 		"num_unconfirmed_txs":  rpcserver.NewRPCFunc(makeNumUnconfirmedTxsFunc(c), ""),
 
@@ -60,12 +60,12 @@ func makeHealthFunc(c *lrpc.Client) rpcHealthFunc {
 	}
 }
 
-type rpcStatusFunc func(ctx *rpctypes.Context) (*ctypes.ResultStatus, error)
+type rpcStatusFunc func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultStatus, error)
 
 // nolint: interfacer
 func makeStatusFunc(c *lrpc.Client) rpcStatusFunc {
-	return func(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
-		return c.Status(ctx.Context())
+	return func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultStatus, error) {
+		return c.Status(ctx.Context(), chainId)
 	}
 }
 
@@ -77,72 +77,73 @@ func makeNetInfoFunc(c *lrpc.Client) rpcNetInfoFunc {
 	}
 }
 
-type rpcBlockchainInfoFunc func(ctx *rpctypes.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error)
+type rpcBlockchainInfoFunc func(ctx *rpctypes.Context, chainId string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error)
 
 func makeBlockchainInfoFunc(c *lrpc.Client) rpcBlockchainInfoFunc {
-	return func(ctx *rpctypes.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
-		return c.BlockchainInfo(ctx.Context(), minHeight, maxHeight)
+	return func(ctx *rpctypes.Context, chainId string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
+		return c.BlockchainInfo(ctx.Context(), chainId, minHeight, maxHeight)
 	}
 }
 
-type rpcGenesisFunc func(ctx *rpctypes.Context) (*ctypes.ResultGenesis, error)
+type rpcGenesisFunc func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultGenesis, error)
 
 func makeGenesisFunc(c *lrpc.Client) rpcGenesisFunc {
-	return func(ctx *rpctypes.Context) (*ctypes.ResultGenesis, error) {
-		return c.Genesis(ctx.Context())
+	return func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultGenesis, error) {
+		return c.Genesis(ctx.Context(), chainId)
 	}
 }
 
-type rpcGenesisChunkedFunc func(ctx *rpctypes.Context, chunk uint) (*ctypes.ResultGenesisChunk, error)
+type rpcGenesisChunkedFunc func(ctx *rpctypes.Context, chainId string, chunk uint) (*ctypes.ResultGenesisChunk, error)
 
 func makeGenesisChunkedFunc(c *lrpc.Client) rpcGenesisChunkedFunc {
-	return func(ctx *rpctypes.Context, chunk uint) (*ctypes.ResultGenesisChunk, error) {
-		return c.GenesisChunked(ctx.Context(), chunk)
+	return func(ctx *rpctypes.Context, chainId string, chunk uint) (*ctypes.ResultGenesisChunk, error) {
+		return c.GenesisChunked(ctx.Context(), chainId, chunk)
 	}
 }
 
-type rpcBlockFunc func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultBlock, error)
+type rpcBlockFunc func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultBlock, error)
 
 func makeBlockFunc(c *lrpc.Client) rpcBlockFunc {
-	return func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultBlock, error) {
-		return c.Block(ctx.Context(), height)
+	return func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultBlock, error) {
+		return c.Block(ctx.Context(), chainId, height)
 	}
 }
 
-type rpcBlockByHashFunc func(ctx *rpctypes.Context, hash []byte) (*ctypes.ResultBlock, error)
+type rpcBlockByHashFunc func(ctx *rpctypes.Context, chainId string, hash []byte) (*ctypes.ResultBlock, error)
 
 func makeBlockByHashFunc(c *lrpc.Client) rpcBlockByHashFunc {
-	return func(ctx *rpctypes.Context, hash []byte) (*ctypes.ResultBlock, error) {
-		return c.BlockByHash(ctx.Context(), hash)
+	return func(ctx *rpctypes.Context, chainId string, hash []byte) (*ctypes.ResultBlock, error) {
+		return c.BlockByHash(ctx.Context(), chainId, hash)
 	}
 }
 
-type rpcBlockResultsFunc func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultBlockResults, error)
+type rpcBlockResultsFunc func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultBlockResults, error)
 
 func makeBlockResultsFunc(c *lrpc.Client) rpcBlockResultsFunc {
-	return func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultBlockResults, error) {
-		return c.BlockResults(ctx.Context(), height)
+	return func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultBlockResults, error) {
+		return c.BlockResults(ctx.Context(), chainId, height)
 	}
 }
 
-type rpcCommitFunc func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultCommit, error)
+type rpcCommitFunc func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultCommit, error)
 
 func makeCommitFunc(c *lrpc.Client) rpcCommitFunc {
-	return func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultCommit, error) {
-		return c.Commit(ctx.Context(), height)
+	return func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultCommit, error) {
+		return c.Commit(ctx.Context(), chainId, height)
 	}
 }
 
-type rpcTxFunc func(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error)
+type rpcTxFunc func(ctx *rpctypes.Context, chainId string, hash []byte, prove bool) (*ctypes.ResultTx, error)
 
 func makeTxFunc(c *lrpc.Client) rpcTxFunc {
-	return func(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
-		return c.Tx(ctx.Context(), hash, prove)
+	return func(ctx *rpctypes.Context, chainId string, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+		return c.Tx(ctx.Context(), chainId, hash, prove)
 	}
 }
 
 type rpcTxSearchFunc func(
 	ctx *rpctypes.Context,
+	chainId string,
 	query string,
 	prove bool,
 	page, perPage *int,
@@ -152,17 +153,19 @@ type rpcTxSearchFunc func(
 func makeTxSearchFunc(c *lrpc.Client) rpcTxSearchFunc {
 	return func(
 		ctx *rpctypes.Context,
+		chainId string,
 		query string,
 		prove bool,
 		page, perPage *int,
 		orderBy string,
 	) (*ctypes.ResultTxSearch, error) {
-		return c.TxSearch(ctx.Context(), query, prove, page, perPage, orderBy)
+		return c.TxSearch(ctx.Context(), chainId, query, prove, page, perPage, orderBy)
 	}
 }
 
 type rpcBlockSearchFunc func(
 	ctx *rpctypes.Context,
+	chainId string,
 	query string,
 	prove bool,
 	page, perPage *int,
@@ -172,61 +175,62 @@ type rpcBlockSearchFunc func(
 func makeBlockSearchFunc(c *lrpc.Client) rpcBlockSearchFunc {
 	return func(
 		ctx *rpctypes.Context,
+		chainId string,
 		query string,
 		prove bool,
 		page, perPage *int,
 		orderBy string,
 	) (*ctypes.ResultBlockSearch, error) {
-		return c.BlockSearch(ctx.Context(), query, page, perPage, orderBy)
+		return c.BlockSearch(ctx.Context(), chainId, query, page, perPage, orderBy)
 	}
 }
 
-type rpcValidatorsFunc func(ctx *rpctypes.Context, height *int64,
+type rpcValidatorsFunc func(ctx *rpctypes.Context, chainId string, height *int64,
 	page, perPage *int) (*ctypes.ResultValidators, error)
 
 func makeValidatorsFunc(c *lrpc.Client) rpcValidatorsFunc {
-	return func(ctx *rpctypes.Context, height *int64, page, perPage *int) (*ctypes.ResultValidators, error) {
-		return c.Validators(ctx.Context(), height, page, perPage)
+	return func(ctx *rpctypes.Context, chainId string, height *int64, page, perPage *int) (*ctypes.ResultValidators, error) {
+		return c.Validators(ctx.Context(), chainId, height, page, perPage)
 	}
 }
 
-type rpcDumpConsensusStateFunc func(ctx *rpctypes.Context) (*ctypes.ResultDumpConsensusState, error)
+type rpcDumpConsensusStateFunc func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultDumpConsensusState, error)
 
 func makeDumpConsensusStateFunc(c *lrpc.Client) rpcDumpConsensusStateFunc {
-	return func(ctx *rpctypes.Context) (*ctypes.ResultDumpConsensusState, error) {
-		return c.DumpConsensusState(ctx.Context())
+	return func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultDumpConsensusState, error) {
+		return c.DumpConsensusState(ctx.Context(), chainId)
 	}
 }
 
-type rpcConsensusStateFunc func(ctx *rpctypes.Context) (*ctypes.ResultConsensusState, error)
+type rpcConsensusStateFunc func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultConsensusState, error)
 
 func makeConsensusStateFunc(c *lrpc.Client) rpcConsensusStateFunc {
-	return func(ctx *rpctypes.Context) (*ctypes.ResultConsensusState, error) {
-		return c.ConsensusState(ctx.Context())
+	return func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultConsensusState, error) {
+		return c.ConsensusState(ctx.Context(), chainId)
 	}
 }
 
-type rpcConsensusParamsFunc func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultConsensusParams, error)
+type rpcConsensusParamsFunc func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultConsensusParams, error)
 
 func makeConsensusParamsFunc(c *lrpc.Client) rpcConsensusParamsFunc {
-	return func(ctx *rpctypes.Context, height *int64) (*ctypes.ResultConsensusParams, error) {
-		return c.ConsensusParams(ctx.Context(), height)
+	return func(ctx *rpctypes.Context, chainId string, height *int64) (*ctypes.ResultConsensusParams, error) {
+		return c.ConsensusParams(ctx.Context(), chainId, height)
 	}
 }
 
-type rpcUnconfirmedTxsFunc func(ctx *rpctypes.Context, limit *int) (*ctypes.ResultUnconfirmedTxs, error)
+type rpcUnconfirmedTxsFunc func(ctx *rpctypes.Context, chainId string, limit *int) (*ctypes.ResultUnconfirmedTxs, error)
 
 func makeUnconfirmedTxsFunc(c *lrpc.Client) rpcUnconfirmedTxsFunc {
-	return func(ctx *rpctypes.Context, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
-		return c.UnconfirmedTxs(ctx.Context(), limit)
+	return func(ctx *rpctypes.Context, chainId string, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
+		return c.UnconfirmedTxs(ctx.Context(), chainId, limit)
 	}
 }
 
-type rpcNumUnconfirmedTxsFunc func(ctx *rpctypes.Context) (*ctypes.ResultUnconfirmedTxs, error)
+type rpcNumUnconfirmedTxsFunc func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultUnconfirmedTxs, error)
 
 func makeNumUnconfirmedTxsFunc(c *lrpc.Client) rpcNumUnconfirmedTxsFunc {
-	return func(ctx *rpctypes.Context) (*ctypes.ResultUnconfirmedTxs, error) {
-		return c.NumUnconfirmedTxs(ctx.Context())
+	return func(ctx *rpctypes.Context, chainId string) (*ctypes.ResultUnconfirmedTxs, error) {
+		return c.NumUnconfirmedTxs(ctx.Context(), chainId)
 	}
 }
 
@@ -254,14 +258,14 @@ func makeBroadcastTxAsyncFunc(c *lrpc.Client) rpcBroadcastTxAsyncFunc {
 	}
 }
 
-type rpcABCIQueryFunc func(ctx *rpctypes.Context, path string,
+type rpcABCIQueryFunc func(ctx *rpctypes.Context, chainId, path string,
 	data bytes.HexBytes, height int64, prove bool) (*ctypes.ResultABCIQuery, error)
 
 func makeABCIQueryFunc(c *lrpc.Client) rpcABCIQueryFunc {
-	return func(ctx *rpctypes.Context, path string, data bytes.HexBytes,
+	return func(ctx *rpctypes.Context, chainId, path string, data bytes.HexBytes,
 		height int64, prove bool) (*ctypes.ResultABCIQuery, error) {
 
-		return c.ABCIQueryWithOptions(ctx.Context(), path, data, rpcclient.ABCIQueryOptions{
+		return c.ABCIQueryWithOptions(ctx.Context(), chainId, path, data, rpcclient.ABCIQueryOptions{
 			Height: height,
 			Prove:  prove,
 		})
@@ -276,11 +280,11 @@ func makeABCIInfoFunc(c *lrpc.Client) rpcABCIInfoFunc {
 	}
 }
 
-type rpcBroadcastEvidenceFunc func(ctx *rpctypes.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error)
+type rpcBroadcastEvidenceFunc func(ctx *rpctypes.Context, chainId string, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error)
 
 // nolint: interfacer
 func makeBroadcastEvidenceFunc(c *lrpc.Client) rpcBroadcastEvidenceFunc {
-	return func(ctx *rpctypes.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
-		return c.BroadcastEvidence(ctx.Context(), ev)
+	return func(ctx *rpctypes.Context, chainId string, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
+		return c.BroadcastEvidence(ctx.Context(), chainId, ev)
 	}
 }
