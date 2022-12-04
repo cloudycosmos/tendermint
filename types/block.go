@@ -907,7 +907,7 @@ func (commit *Commit) ValidateBasic() error {
 		}
 	}
 	if len(commit.ChainID) == 0 {
-		return errors.New("empty ChainID")
+		return errors.New("empty ChainID in commit")
 	}
 	return nil
 }
