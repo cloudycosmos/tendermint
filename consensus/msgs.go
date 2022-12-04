@@ -245,6 +245,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Round:   msg.VoteSetMaj23.Round,
 			Type:    msg.VoteSetMaj23.Type,
 			BlockID: *bi,
+			ChainID: msg.VoteSetMaj23.ChainID,
 		}
 	case *tmcons.Message_VoteSetBits:
 		bi, err := types.BlockIDFromProto(&msg.VoteSetBits.BlockID)
@@ -260,6 +261,7 @@ func MsgFromProto(msg *tmcons.Message) (Message, error) {
 			Type:    msg.VoteSetBits.Type,
 			BlockID: *bi,
 			Votes:   bits,
+			ChainID: msg.VoteSetBits.ChainID,
 		}
 	default:
 		return nil, fmt.Errorf("consensus: message not recognized: %T", msg)
