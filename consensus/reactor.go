@@ -80,10 +80,10 @@ func NewReactor(consensusStateMap map[string]*State, waitSyncMap map[string]bool
 // broadcasted to other peers and starting state if we're not in fast sync.
 func (conR *Reactor) OnStart() error {
 	// start routine that computes peer statistics for evaluating peer quality
-	go conR.peerStatsRoutine()
+	conR.peerStatsRoutine()
 
 	conR.subscribeToBroadcastEvents()
-	go conR.updateRoundStateRoutine()
+	conR.updateRoundStateRoutine()
 
 	for _, chainID := range conR.Switch.AllChainIDs() {
 		conR.Logger.Info("Reactor ", "waitSync", conR.WaitSync(chainID))
@@ -206,10 +206,9 @@ func (conR *Reactor) AddPeer(peer p2p.Peer) {
 		panic(fmt.Sprintf("peer %v has no state", peer))
 	}
 	// Begin routines for this peer.
-	go conR.gossipDataRoutine(peer, peerState)
-	go conR.gossipVotesRoutine(peer, peerState)
-	go conR.queryMaj23Routine(peer, peerState)
-
+	conR.gossipDataRoutine(peer, peerState)
+	conR.gossipVotesRoutine(peer, peerState)
+	conR.queryMaj23Routine(peer, peerState)
 
 	for _, chainID := range conR.Switch.AllChainIDs() {
 		// Send our state to peer.
@@ -260,6 +259,7 @@ func (conR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 
 	chainID := msg.GetChainID()
 	if ! conR.Switch.IsValidChainID(chainID) {    // We don't handle the chainID which is not for this node
+		conR.Logger.Error("YI: Receive ERROR", "src", src, "chId", chID, "bytes", msgBytes, "chain_id", chainID)
 		return                                // YITODO: Do we want to forward msg to other peers?
 	}
 
@@ -533,7 +533,7 @@ func (conR *Reactor) sendNewRoundStepMessage(peer p2p.Peer, chainID string) {
 
 func (conR *Reactor) updateRoundStateRoutine() {
 	for chainID := range conR.conSMap {
-		conR.updateRoundStateRoutineRaw(chainID)
+		go conR.updateRoundStateRoutineRaw(chainID)
 	}
 }
 
@@ -561,12 +561,12 @@ func (conR *Reactor) getRoundState(chainID string) *cstypes.RoundState {
 func (conR *Reactor) gossipDataRoutine(peer p2p.Peer, ps *PeerState) {
 	chainIDs := conR.Switch.AllChainIDs()
 	for _, chainID := range chainIDs {
-		conR.gossipDataRoutineRaw(peer, ps, chainID)
+		go conR.gossipDataRoutineRaw(peer, ps, chainID)
 	}
 }
 
 func (conR *Reactor) gossipDataRoutineRaw(peer p2p.Peer, ps *PeerState, chainID string) {
-	logger := conR.Logger.With("peer", peer)
+	logger := conR.Logger.With("peer", peer).With("chain_id", chainID)
 
 OUTER_LOOP:
 	for {
@@ -632,6 +632,7 @@ OUTER_LOOP:
 		// Now consider sending other things, like the Proposal itself.
 
 		// Send Proposal && ProposalPOL BitArray?
+
 		if rs.Proposal != nil && !prs.Proposal {
 			// Proposal: share the proposal metadata with peer.
 			{
@@ -713,7 +714,7 @@ func (conR *Reactor) gossipDataForCatchup(logger log.Logger, rs *cstypes.RoundSt
 func (conR *Reactor) gossipVotesRoutine(peer p2p.Peer, ps *PeerState) {
 	chainIDs := conR.Switch.AllChainIDs()
 	for _, chainID := range chainIDs {
-		conR.gossipVotesRoutineRaw(peer, ps, chainID)
+		go conR.gossipVotesRoutineRaw(peer, ps, chainID)
 	}
 }
 
@@ -855,7 +856,7 @@ func (conR *Reactor) gossipVotesForHeight(
 func (conR *Reactor) queryMaj23Routine(peer p2p.Peer, ps *PeerState) {
 	allChainIDs := conR.Switch.AllChainIDs()
 	for _, chainID := range allChainIDs {
-		conR.queryMaj23RoutineRaw(peer, ps, chainID)
+		go conR.queryMaj23RoutineRaw(peer, ps, chainID)
 	}
 }
 
@@ -954,7 +955,7 @@ OUTER_LOOP:
 func (conR *Reactor) peerStatsRoutine() {
 	chainIDs := conR.Switch.AllChainIDs()
 	for _, chainID := range chainIDs {
-		conR.peerStatsRoutineRaw(chainID)
+		go conR.peerStatsRoutineRaw(chainID)
 	}
 }
 
@@ -1378,6 +1379,8 @@ func (ps *PeerState) SetHasVote(vote *types.Vote) {
 func (ps *PeerState) setHasVote(height int64, round int32, voteType tmproto.SignedMsgType, index int32, chainID string) {
 	PRS := ps.PRSMap[chainID]
 	logger := ps.logger.With(
+		"chain_id",
+		chainID,
 		"peerH/R",
 		fmt.Sprintf("%d/%d", PRS.Height, PRS.Round),
 		"H/R",
@@ -1684,6 +1687,9 @@ func (m *NewValidBlockMessage) ValidateBasic() error {
 	if m.BlockParts.Size() > int(types.MaxBlockPartsCount) {
 		return fmt.Errorf("blockParts bit array is too big: %d, max: %d", m.BlockParts.Size(), types.MaxBlockPartsCount)
 	}
+	if len(m.ChainID) < 1 {
+		return errors.New("empty ChainID in NewValidBlockMessage")
+	}
 	return nil
 }
 
@@ -1744,6 +1750,9 @@ func (m *ProposalPOLMessage) ValidateBasic() error {
 	if m.ProposalPOL.Size() > types.MaxVotesCount {
 		return fmt.Errorf("proposalPOL bit array is too big: %d, max: %d", m.ProposalPOL.Size(), types.MaxVotesCount)
 	}
+	if len(m.ChainID) < 1 {
+		return errors.New("empty ChainID in ProposalPOLMessage")
+	}
 	return nil
 }
 
@@ -1777,6 +1786,9 @@ func (m *BlockPartMessage) ValidateBasic() error {
 	}
 	if err := m.Part.ValidateBasic(); err != nil {
 		return fmt.Errorf("wrong Part: %v", err)
+	}
+	if len(m.ChainID) < 1 {
+		return errors.New("empty ChainID in BlockPartMessage")
 	}
 	return nil
 }
@@ -1879,6 +1891,9 @@ func (m *VoteSetMaj23Message) ValidateBasic() error {
 	if err := m.BlockID.ValidateBasic(); err != nil {
 		return fmt.Errorf("wrong BlockID: %v", err)
 	}
+	if len(m.ChainID) < 1 {
+		return errors.New("empty ChainID in VoteSetMaj23Message")
+	}
 	return nil
 }
 
@@ -1918,6 +1933,9 @@ func (m *VoteSetBitsMessage) ValidateBasic() error {
 	// NOTE: Votes.Size() can be zero if the node does not have any
 	if m.Votes.Size() > types.MaxVotesCount {
 		return fmt.Errorf("votes bit array is too big: %d, max: %d", m.Votes.Size(), types.MaxVotesCount)
+	}
+	if len(m.ChainID) < 1 {
+		return errors.New("empty ChainID in VoteSetBitsMessage")
 	}
 	return nil
 }
