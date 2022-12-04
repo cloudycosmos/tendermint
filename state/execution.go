@@ -82,7 +82,7 @@ func NewBlockExecutor(
 		res := NewBlockExecutorRaw(
 			chainID,
 			stateStore,
-			logger,
+			logger.With("chain_id", chainID),
 			proxyApp.Consensus(),
 			mempool,
 			evpool,
