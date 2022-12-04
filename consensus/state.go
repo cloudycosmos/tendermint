@@ -201,8 +201,9 @@ func NewState(
 
 // SetLogger implements Service.
 func (cs *State) SetLogger(l log.Logger) {
-	cs.BaseService.Logger = l
-	cs.timeoutTicker.SetLogger(l)
+	ll := l.With("chain_id", cs.ChainID);    // added by Yi
+	cs.BaseService.Logger = ll
+	cs.timeoutTicker.SetLogger(ll)
 }
 
 // SetEventBus sets event bus.
