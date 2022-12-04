@@ -11,7 +11,25 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	rpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	"github.com/tendermint/tendermint/types"
+
+	cfg "github.com/tendermint/tendermint/config"
+	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 )
+
+// retriveTxChainIDFromMemo decode the tx and get the chainID from tx
+// body's memo field.
+func retrieveTxChainIDFromMemo(tx types.Tx) string {
+	memo := authtx.GetTxMemo(tx)
+	if len(memo) < 10 {
+		return ""
+	}
+
+	if memo[:9] == "chain_id:" {
+		return memo[9:]
+	} else {
+		return ""
+	}
+}
 
 //-----------------------------------------------------------------------------
 // NOTE: tx should be signed, but this is only checked at the app level (not by Tendermint!)
@@ -34,21 +52,28 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 // More: https://docs.tendermint.com/master/rpc/#/Tx/broadcast_tx_sync
 func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	resCh := make(chan *abci.Response, 1)
-	var err error
-	// YITODO: to make the following loop go-routines
-	for _, mempool := range env.MempoolMap {
-		err := mempool.CheckTx(tx, func(res *abci.Response) {
-			resCh <- res
-		}, mempl.TxInfo{})
 
-		if err == nil {
-			break
-		}
+	chainID := ""
+	chainIDs := cfg.GetAllChainIDs()
+	if len(chainIDs) == 1 {
+		chainID = chainIDs[0]
+	} else {
+		chainID = retrieveTxChainIDFromMemo(tx)
 	}
+
+	mempool, ok := env.MempoolMap[chainID]
+	if !ok {
+		return nil, fmt.Errorf("No valid chain_id found")
+	}
+
+	err := mempool.CheckTx(tx, func(res *abci.Response) {
+		resCh <- res
+	}, mempl.TxInfo{})
 
 	if err != nil {
 		return nil, err
 	}
+
 	res := <-resCh
 	r := res.GetCheckTx()
 	return &ctypes.ResultBroadcastTx{
