@@ -256,6 +256,15 @@ func GetAllChainIDs() []string {
 	}
 	return allChainIDs
 }
+func IsChainIDValid(chainID string) bool {
+	allChainIDs := GetAllChainIDs()
+	for _, chnID := range allChainIDs {
+		if (chnID == chainID) {
+			return true
+		}
+	}
+	return false
+}
 
 // DefaultBaseConfig returns a default base configuration for a Tendermint node
 func DefaultBaseConfig() BaseConfig {
