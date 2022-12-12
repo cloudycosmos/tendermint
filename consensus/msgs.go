@@ -32,6 +32,7 @@ func MsgToProto(msg Message) (*tmcons.Message, error) {
 					Step:                  uint32(msg.Step),
 					SecondsSinceStartTime: msg.SecondsSinceStartTime,
 					LastCommitRound:       msg.LastCommitRound,
+					ChainID:               msg.ChainID,
 				},
 			},
 		}

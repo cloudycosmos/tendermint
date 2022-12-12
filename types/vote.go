@@ -56,6 +56,7 @@ type Vote struct {
 	ValidatorAddress Address               `json:"validator_address"`
 	ValidatorIndex   int32                 `json:"validator_index"`
 	Signature        []byte                `json:"signature"`
+	ChainID          string                `json:"chain_id"`  // Added by Yi
 }
 
 // CommitSig converts the Vote to a CommitSig.
@@ -217,6 +218,7 @@ func (vote *Vote) ToProto() *tmproto.Vote {
 		ValidatorAddress: vote.ValidatorAddress,
 		ValidatorIndex:   vote.ValidatorIndex,
 		Signature:        vote.Signature,
+		ChainID:          vote.ChainID,
 	}
 }
 

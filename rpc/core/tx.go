@@ -17,13 +17,13 @@ import (
 // transaction is in the mempool, invalidated, or was not sent in the first
 // place.
 // More: https://docs.tendermint.com/master/rpc/#/Info/tx
-func Tx(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+func Tx(ctx *rpctypes.Context, chainID string, hash []byte, prove bool) (*ctypes.ResultTx, error) {
 	// if index is disabled, return error
-	if _, ok := env.TxIndexer.(*null.TxIndex); ok {
+	if _, ok := env.TxIndexerMap[chainID].(*null.TxIndex); ok {
 		return nil, fmt.Errorf("transaction indexing is disabled")
 	}
 
-	r, err := env.TxIndexer.Get(hash)
+	r, err := env.TxIndexerMap[chainID].Get(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func Tx(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error
 
 	var proof types.TxProof
 	if prove {
-		block := env.BlockStore.LoadBlock(height)
+		block := env.BlockStoreMap[chainID].LoadBlock(height)
 		proof = block.Data.Txs.Proof(int(index)) // XXX: overflow on 32-bit machines
 	}
 
@@ -56,6 +56,7 @@ func Tx(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error
 // More: https://docs.tendermint.com/master/rpc/#/Info/tx_search
 func TxSearch(
 	ctx *rpctypes.Context,
+	chainID string,
 	query string,
 	prove bool,
 	pagePtr, perPagePtr *int,
@@ -63,7 +64,7 @@ func TxSearch(
 ) (*ctypes.ResultTxSearch, error) {
 
 	// if index is disabled, return error
-	if _, ok := env.TxIndexer.(*null.TxIndex); ok {
+	if _, ok := env.TxIndexerMap[chainID].(*null.TxIndex); ok {
 		return nil, errors.New("transaction indexing is disabled")
 	}
 
@@ -72,7 +73,7 @@ func TxSearch(
 		return nil, err
 	}
 
-	results, err := env.TxIndexer.Search(ctx.Context(), q)
+	results, err := env.TxIndexerMap[chainID].Search(ctx.Context(), q)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func TxSearch(
 
 		var proof types.TxProof
 		if prove {
-			block := env.BlockStore.LoadBlock(r.Height)
+			block := env.BlockStoreMap[chainID].LoadBlock(r.Height)
 			proof = block.Data.Txs.Proof(int(r.Index)) // XXX: overflow on 32-bit machines
 		}
 

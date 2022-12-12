@@ -27,7 +27,7 @@ import (
 // persistent kvstore application and special consensus wal instance
 // (byteBufferWAL) and waits until numBlocks are created.
 // If the node fails to produce given numBlocks, it returns an error.
-func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int) (err error) {
+func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int, chainID string) (err error) {
 	config := getConfig(t)
 
 	app := kvstore.NewPersistentKVStoreApplication(filepath.Join(config.DBDir(), "wal_generator"))
@@ -41,7 +41,7 @@ func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int) (err error) {
 	privValidatorKeyFile := config.PrivValidatorKeyFile()
 	privValidatorStateFile := config.PrivValidatorStateFile()
 	privValidator := privval.LoadOrGenFilePV(privValidatorKeyFile, privValidatorStateFile)
-	genDoc, err := types.GenesisDocFromFile(config.GenesisFile())
+	genDoc, err := types.GenesisDocFromFile(config.GenesisFile(chainID))
 	if err != nil {
 		return fmt.Errorf("failed to read genesis file: %w", err)
 	}
@@ -82,7 +82,7 @@ func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int) (err error) {
 	})
 	mempool := emptyMempool{}
 	evpool := sm.EmptyEvidencePool{}
-	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
+	blockExec := sm.NewBlockExecutorRaw(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
 	consensusState := NewState(config.Consensus, state.Copy(), blockExec, blockStore, mempool, evpool)
 	consensusState.SetLogger(logger)
 	consensusState.SetEventBus(eventBus)
@@ -120,11 +120,11 @@ func WALGenerateNBlocks(t *testing.T, wr io.Writer, numBlocks int) (err error) {
 }
 
 // WALWithNBlocks returns a WAL content with numBlocks.
-func WALWithNBlocks(t *testing.T, numBlocks int) (data []byte, err error) {
+func WALWithNBlocks(t *testing.T, numBlocks int, chainID string) (data []byte, err error) {
 	var b bytes.Buffer
 	wr := bufio.NewWriter(&b)
 
-	if err := WALGenerateNBlocks(t, wr, numBlocks); err != nil {
+	if err := WALGenerateNBlocks(t, wr, numBlocks, chainID); err != nil {
 		return []byte{}, err
 	}
 

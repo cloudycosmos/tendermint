@@ -32,9 +32,9 @@ const (
 // peers you received it from.
 type Reactor struct {
 	p2p.BaseReactor
-	config  *cfg.MempoolConfig
-	mempool *CListMempool
-	ids     *mempoolIDs
+	config     *cfg.MempoolConfig
+	mempoolMap map[string]*CListMempool
+	ids        *mempoolIDs
 }
 
 type mempoolIDs struct {
@@ -101,11 +101,11 @@ func newMempoolIDs() *mempoolIDs {
 }
 
 // NewReactor returns a new Reactor with the given config and mempool.
-func NewReactor(config *cfg.MempoolConfig, mempool *CListMempool) *Reactor {
+func NewReactor(config *cfg.MempoolConfig, mempoolMap map[string]*CListMempool) *Reactor {
 	memR := &Reactor{
-		config:  config,
-		mempool: mempool,
-		ids:     newMempoolIDs(),
+		config:     config,
+		mempoolMap: mempoolMap,
+		ids:        newMempoolIDs(),
 	}
 	memR.BaseReactor = *p2p.NewBaseReactor("Mempool", memR)
 	return memR
@@ -120,7 +120,9 @@ func (memR *Reactor) InitPeer(peer p2p.Peer) p2p.Peer {
 // SetLogger sets the Logger on the reactor and the underlying mempool.
 func (memR *Reactor) SetLogger(l log.Logger) {
 	memR.Logger = l
-	memR.mempool.SetLogger(l)
+	for _, mempool := range memR.mempoolMap {
+		mempool.SetLogger(l)
+	}
 }
 
 // OnStart implements p2p.BaseReactor.
@@ -180,11 +182,15 @@ func (memR *Reactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 		txInfo.SenderP2PID = src.ID()
 	}
 	for _, tx := range msg.Txs {
-		err = memR.mempool.CheckTx(tx, nil, txInfo)
-		if err == ErrTxInCache {
-			memR.Logger.Debug("Tx already exists in cache", "tx", txID(tx))
-		} else if err != nil {
-			memR.Logger.Info("Could not check tx", "tx", txID(tx), "err", err)
+		//TODO: we'll embed chainCode into msgs. chainCode can be translated into chainID.
+		if mempool, found := memR.mempoolMap["Need a real chainCod"]; found {
+			err = mempool.CheckTx(tx, nil, txInfo)
+
+			if err == ErrTxInCache {
+				memR.Logger.Debug("Tx already exists in cache", "tx", txID(tx))
+			} else if err != nil {
+				memR.Logger.Info("Could not check tx", "tx", txID(tx), "err", err)
+			}
 		}
 	}
 	// broadcasting happens from go routines per peer
@@ -198,6 +204,29 @@ type PeerState interface {
 // Send new mempool txs to peer.
 func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 	peerID := memR.ids.GetForPeer(peer)
+
+	var quitChans []chan<- struct{}
+	for _, mempool := range memR.mempoolMap {
+		quitChan := make(chan struct{})
+		quitChans = append(quitChans, quitChan)
+		go memR.broadcastTxRoutineRaw(peer, peerID, mempool, quitChan)
+	}
+
+	select {
+	case <-peer.Quit():
+		for _, quitChan := range quitChans {
+			quitChan <- struct{}{}
+		}
+		return
+	case <-memR.Quit():
+		for _, quitChan := range quitChans {
+			quitChan <- struct{}{}
+		}
+		return
+	}
+}
+
+func (memR *Reactor) broadcastTxRoutineRaw(peer p2p.Peer, peerID uint16, mempool *CListMempool, quitChan <-chan struct{}) {
 	var next *clist.CElement
 
 	for {
@@ -210,13 +239,11 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		// start from the beginning.
 		if next == nil {
 			select {
-			case <-memR.mempool.TxsWaitChan(): // Wait until a tx is available
-				if next = memR.mempool.TxsFront(); next == nil {
+			case <-mempool.TxsWaitChan(): // Wait until a tx is available
+				if next = mempool.TxsFront(); next == nil {
 					continue
 				}
-			case <-peer.Quit():
-				return
-			case <-memR.Quit():
+			case <-quitChan:
 				return
 			}
 		}
@@ -264,9 +291,7 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		case <-next.NextWaitChan():
 			// see the start of the for loop for nil check
 			next = next.Next()
-		case <-peer.Quit():
-			return
-		case <-memR.Quit():
+		case <-quitChan:
 			return
 		}
 	}

@@ -93,33 +93,33 @@ func UnsafeDialPeers(ctx *rpctypes.Context, peers []string, persistent, uncondit
 
 // Genesis returns genesis file.
 // More: https://docs.tendermint.com/master/rpc/#/Info/genesis
-func Genesis(ctx *rpctypes.Context) (*ctypes.ResultGenesis, error) {
-	if len(env.genChunks) > 1 {
+func Genesis(ctx *rpctypes.Context, chainID string) (*ctypes.ResultGenesis, error) {
+	if len(env.genChunksMap[chainID]) > 1 {
 		return nil, errors.New("genesis response is large, please use the genesis_chunked API instead")
 	}
 
-	return &ctypes.ResultGenesis{Genesis: env.GenDoc}, nil
+	return &ctypes.ResultGenesis{Genesis: env.GenDocMap[chainID]}, nil
 }
 
-func GenesisChunked(ctx *rpctypes.Context, chunk uint) (*ctypes.ResultGenesisChunk, error) {
-	if env.genChunks == nil {
+func GenesisChunked(ctx *rpctypes.Context, chainID string, chunk uint) (*ctypes.ResultGenesisChunk, error) {
+	if env.genChunksMap[chainID] == nil {
 		return nil, fmt.Errorf("service configuration error, genesis chunks are not initialized")
 	}
 
-	if len(env.genChunks) == 0 {
+	if len(env.genChunksMap[chainID]) == 0 {
 		return nil, fmt.Errorf("service configuration error, there are no chunks")
 	}
 
 	id := int(chunk)
 
-	if id > len(env.genChunks)-1 {
-		return nil, fmt.Errorf("there are %d chunks, %d is invalid", len(env.genChunks)-1, id)
+	if id > len(env.genChunksMap[chainID])-1 {
+		return nil, fmt.Errorf("there are %d chunks, %d is invalid", len(env.genChunksMap[chainID])-1, id)
 	}
 
 	return &ctypes.ResultGenesisChunk{
-		TotalChunks: len(env.genChunks),
+		TotalChunks: len(env.genChunksMap[chainID]),
 		ChunkNumber: id,
-		Data:        env.genChunks[id],
+		Data:        env.genChunksMap[chainID][id],
 	}, nil
 }
 

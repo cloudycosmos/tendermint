@@ -17,8 +17,8 @@ import (
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	bcv0 "github.com/tendermint/tendermint/blockchain/v0"
-	bcv1 "github.com/tendermint/tendermint/blockchain/v1"
-	bcv2 "github.com/tendermint/tendermint/blockchain/v2"
+//	bcv1 "github.com/tendermint/tendermint/blockchain/v1"
+//	bcv2 "github.com/tendermint/tendermint/blockchain/v2"
 	cfg "github.com/tendermint/tendermint/config"
 	cs "github.com/tendermint/tendermint/consensus"
 	"github.com/tendermint/tendermint/crypto"
@@ -40,7 +40,7 @@ import (
 	"github.com/tendermint/tendermint/state/indexer"
 	blockidxkv "github.com/tendermint/tendermint/state/indexer/block/kv"
 	blockidxnull "github.com/tendermint/tendermint/state/indexer/block/null"
-	"github.com/tendermint/tendermint/state/indexer/sink/psql"
+//	"github.com/tendermint/tendermint/state/indexer/sink/psql"
 	"github.com/tendermint/tendermint/state/txindex"
 	"github.com/tendermint/tendermint/state/txindex/kv"
 	"github.com/tendermint/tendermint/state/txindex/null"
@@ -76,13 +76,13 @@ func DefaultDBProvider(ctx *DBContext) (dbm.DB, error) {
 // GenesisDocProvider returns a GenesisDoc.
 // It allows the GenesisDoc to be pulled from sources other than the
 // filesystem, for instance from a distributed key-value store cluster.
-type GenesisDocProvider func() (*types.GenesisDoc, error)
+type GenesisDocProvider func(string) (*types.GenesisDoc, error)
 
 // DefaultGenesisDocProviderFunc returns a GenesisDocProvider that loads
 // the GenesisDoc from the config.GenesisFile() on the filesystem.
 func DefaultGenesisDocProviderFunc(config *cfg.Config) GenesisDocProvider {
-	return func() (*types.GenesisDoc, error) {
-		return types.GenesisDocFromFile(config.GenesisFile())
+	return func(chainID string) (*types.GenesisDoc, error) {
+		return types.GenesisDocFromFile(config.GenesisFile(chainID))
 	}
 }
 
@@ -116,7 +116,8 @@ type MetricsProvider func(chainID string) (*cs.Metrics, *p2p.Metrics, *mempl.Met
 // if Prometheus is enabled. Otherwise, it returns no-op Metrics.
 func DefaultMetricsProvider(config *cfg.InstrumentationConfig) MetricsProvider {
 	return func(chainID string) (*cs.Metrics, *p2p.Metrics, *mempl.Metrics, *sm.Metrics) {
-		if config.Prometheus {
+		//if config.Prometheus {
+		if false {
 			return cs.PrometheusMetrics(config.Namespace, "chain_id", chainID),
 				p2p.PrometheusMetrics(config.Namespace, "chain_id", chainID),
 				mempl.PrometheusMetrics(config.Namespace, "chain_id", chainID),
@@ -193,7 +194,7 @@ type Node struct {
 
 	// config
 	config        *cfg.Config
-	genesisDoc    *types.GenesisDoc   // initial validator set
+	genesisDocMap map[string]*types.GenesisDoc   // initial validator set
 	privValidator types.PrivValidator // local node's validator key
 
 	// network
@@ -205,29 +206,61 @@ type Node struct {
 	isListening bool
 
 	// services
-	eventBus          *types.EventBus // pub/sub for services
-	stateStore        sm.Store
-	blockStore        *store.BlockStore // store the blockchain to disk
-	bcReactor         p2p.Reactor       // for fast-syncing
-	mempoolReactor    *mempl.Reactor    // for gossipping transactions
-	mempool           mempl.Mempool
-	stateSync         bool                    // whether the node should state sync on startup
-	stateSyncReactor  *statesync.Reactor      // for hosting and restoring state sync snapshots
-	stateSyncProvider statesync.StateProvider // provides state data for bootstrapping a node
-	stateSyncGenesis  sm.State                // provides the genesis state for state sync
-	consensusState    *cs.State               // latest consensus state
-	consensusReactor  *cs.Reactor             // for participating in the consensus
-	pexReactor        *pex.Reactor            // for exchanging peer addresses
-	evidencePool      *evidence.Pool          // tracking evidence
-	proxyApp          proxy.AppConns          // connection to the application
-	rpcListeners      []net.Listener          // rpc servers
-	txIndexer         txindex.TxIndexer
-	blockIndexer      indexer.BlockIndexer
-	indexerService    *txindex.IndexerService
+	eventBus          *types.EventBus              // pub/sub for services
+	stateStoreMap     map[string]sm.Store
+	blockStoreMap     map[string]*store.BlockStore // store the blockchain to disk
+	bcReactor         p2p.Reactor                  // for fast-syncing
+	mempoolReactor    *mempl.Reactor               // for gossipping transactions
+	mempoolMap        map[string]mempl.Mempool
+	stateSyncMap      map[string]bool               // whether the node should state sync on startup
+	stateSyncReactor  *statesync.Reactor           // for hosting and restoring state sync snapshots
+	stateSyncProvider statesync.StateProvider      // provides state data for bootstrapping a node
+	stateSyncGenesisMap  map[string]sm.State                     // provides the genesis state for state sync
+	consensusStateMap map[string]*cs.State         // latest consensus state
+	consensusReactor  *cs.Reactor                  // for participating in the consensus
+	pexReactor        *pex.Reactor                 // for exchanging peer addresses
+	evidencePoolMap   map[string]*evidence.Pool    // tracking evidence
+	proxyApp          proxy.AppConns               // connection to the application
+	rpcListeners      []net.Listener               // rpc servers
+	txIndexerMap      map[string]txindex.TxIndexer
+	blockIndexerMap   map[string]indexer.BlockIndexer
+	indexerServiceMap map[string]*txindex.IndexerService
 	prometheusSrv     *http.Server
+
+	// added by Ethan
+	allChainIDs      []string
 }
 
-func initDBs(config *cfg.Config, dbProvider DBProvider) (blockStore *store.BlockStore, stateDB dbm.DB, err error) {
+func initDBs(config *cfg.Config, dbProvider DBProvider, allChainIDs []string) (blockStoreMap map[string]*store.BlockStore, stateDBMap map[string]dbm.DB, err error) {
+	blockStoreMap = make(map[string]*store.BlockStore)
+	stateDBMap = make(map[string]dbm.DB)
+
+	var blockStoreDB dbm.DB
+	blockStoreDB, err = dbProvider(&DBContext{"blockstore", config})
+	if err != nil {
+		return
+	}
+
+	stateDB, err := dbProvider(&DBContext{"state", config})
+	if err != nil {
+		return
+	}
+
+
+	for _, chainID := range(allChainIDs) {
+		bsDB := dbm.NewPrefixDB(blockStoreDB, []byte(chainID))
+		blockStore := store.NewBlockStore(bsDB)
+
+		stDB := dbm.NewPrefixDB(stateDB, []byte(chainID))
+
+		blockStoreMap[chainID] = blockStore
+		stateDBMap[chainID] = stDB
+	}
+
+	return
+}
+
+func initDBsRaw(config *cfg.Config, dbProvider DBProvider, chainID string) (blockStore *store.BlockStore, stateDB dbm.DB, err error) {
 	var blockStoreDB dbm.DB
 	blockStoreDB, err = dbProvider(&DBContext{"blockstore", config})
 	if err != nil {
@@ -261,7 +294,33 @@ func createAndStartEventBus(logger log.Logger) (*types.EventBus, error) {
 	return eventBus, nil
 }
 
+
 func createAndStartIndexerService(
+	config *cfg.Config,
+	chainIDs []string,
+	dbProvider DBProvider,
+	eventBus *types.EventBus,
+	logger log.Logger,
+) (map[string]*txindex.IndexerService, map[string]txindex.TxIndexer, map[string]indexer.BlockIndexer, error) {
+	indexerServiceMap := make(map[string]*txindex.IndexerService)
+	txIndexerMap      := make(map[string]txindex.TxIndexer)
+	blockIndexerMap   := make(map[string]indexer.BlockIndexer)
+
+	for _, chainID := range(chainIDs) {
+		indexerService, txIndexer, blockIndexer, err := createAndStartIndexerServiceRaw(config,
+			chainID, dbProvider, eventBus, logger)
+		if err != nil {
+			return indexerServiceMap, txIndexerMap, blockIndexerMap, err
+		}
+		indexerServiceMap[chainID] = indexerService
+		txIndexerMap[chainID]      = txIndexer
+		blockIndexerMap[chainID]   = blockIndexer
+	}
+
+	return indexerServiceMap, txIndexerMap, blockIndexerMap, nil
+}
+
+func createAndStartIndexerServiceRaw(
 	config *cfg.Config,
 	chainID string,
 	dbProvider DBProvider,
@@ -280,21 +339,12 @@ func createAndStartIndexerService(
 		if err != nil {
 			return nil, nil, nil, err
 		}
+		store = dbm.NewPrefixDB(store, []byte(chainID))
 
 		txIndexer = kv.NewTxIndex(store)
 		blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
 
-	case "psql":
-		if config.TxIndex.PsqlConn == "" {
-			return nil, nil, nil, errors.New(`no psql-conn is set for the "psql" indexer`)
-		}
-		es, err := psql.NewEventSink(config.TxIndex.PsqlConn, chainID)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("creating psql indexer: %w", err)
-		}
-		txIndexer = es.TxIndexer()
-		blockIndexer = es.BlockIndexer()
-
+	// no need to support psql
 	default:
 		txIndexer = &null.TxIndex{}
 		blockIndexer = &blockidxnull.BlockerIndexer{}
@@ -362,57 +412,78 @@ func onlyValidatorIsUs(state sm.State, pubKey crypto.PubKey) bool {
 }
 
 func createMempoolAndMempoolReactor(config *cfg.Config, proxyApp proxy.AppConns,
-	state sm.State, memplMetrics *mempl.Metrics, logger log.Logger) (*mempl.Reactor, *mempl.CListMempool) {
+	stateMap map[string]sm.State, memplMetrics *mempl.Metrics, logger log.Logger) (*mempl.Reactor, map[string]*mempl.CListMempool) {
 
-	mempool := mempl.NewCListMempool(
-		config.Mempool,
-		proxyApp.Mempool(),
-		state.LastBlockHeight,
-		mempl.WithMetrics(memplMetrics),
-		mempl.WithPreCheck(sm.TxPreCheck(state)),
-		mempl.WithPostCheck(sm.TxPostCheck(state)),
-	)
+	mempoolMap := make(map[string]*mempl.CListMempool)
+	for chainID, state := range stateMap {
+		mempool := mempl.NewCListMempool(
+			config.Mempool,
+			proxyApp.Mempool(),
+			state.LastBlockHeight,
+			mempl.WithMetrics(memplMetrics),
+			mempl.WithPreCheck(sm.TxPreCheck(state)),
+			mempl.WithPostCheck(sm.TxPostCheck(state)),
+		)
+		mempoolMap[chainID] = mempool
+
+		if config.Consensus.WaitForTxs() {
+			mempool.EnableTxsAvailable()
+		}
+	}
 	mempoolLogger := logger.With("module", "mempool")
-	mempoolReactor := mempl.NewReactor(config.Mempool, mempool)
+	mempoolReactor := mempl.NewReactor(config.Mempool, mempoolMap)
 	mempoolReactor.SetLogger(mempoolLogger)
 
-	if config.Consensus.WaitForTxs() {
-		mempool.EnableTxsAvailable()
-	}
-	return mempoolReactor, mempool
+	return mempoolReactor, mempoolMap
 }
 
 func createEvidenceReactor(config *cfg.Config, dbProvider DBProvider,
-	stateDB dbm.DB, blockStore *store.BlockStore, logger log.Logger) (*evidence.Reactor, *evidence.Pool, error) {
+	stateDBMap map[string]dbm.DB, blockStoreMap map[string]*store.BlockStore, logger log.Logger) (*evidence.Reactor, map[string]*evidence.Pool, error) {
 
 	evidenceDB, err := dbProvider(&DBContext{"evidence", config})
 	if err != nil {
 		return nil, nil, err
 	}
 	evidenceLogger := logger.With("module", "evidence")
-	evidencePool, err := evidence.NewPool(evidenceDB, sm.NewStore(stateDB), blockStore)
-	if err != nil {
-		return nil, nil, err
+
+	evidencePoolMap := make(map[string]*evidence.Pool)
+	for chainID := range stateDBMap {
+		stateDB := stateDBMap[chainID]
+		blockStore := blockStoreMap[chainID]
+		evidenceDB = dbm.NewPrefixDB(evidenceDB, []byte(chainID))
+		evidencePool, err := evidence.NewPool(evidenceDB, sm.NewStore(stateDB), blockStore)
+		if err != nil {
+			return nil, nil, err
+		}
+		evidencePoolMap[chainID] = evidencePool
 	}
-	evidenceReactor := evidence.NewReactor(evidencePool)
+	evidenceReactor := evidence.NewReactor(evidencePoolMap)
 	evidenceReactor.SetLogger(evidenceLogger)
-	return evidenceReactor, evidencePool, nil
+	return evidenceReactor, evidencePoolMap, nil
 }
 
 func createBlockchainReactor(config *cfg.Config,
-	state sm.State,
-	blockExec *sm.BlockExecutor,
-	blockStore *store.BlockStore,
-	fastSync bool,
+	stateMap map[string]sm.State,
+	blockExecMap map[string]*sm.BlockExecutor,
+	blockStoreMap map[string]*store.BlockStore,
+	fastSyncMap map[string]bool,
 	logger log.Logger) (bcReactor p2p.Reactor, err error) {
+
+	stateCopyMap := make(map[string]sm.State)
+
+	for chainID, state := range stateMap {
+		newState := state.Copy()
+		stateCopyMap[chainID] = newState
+	}
 
 	switch config.FastSync.Version {
 	case "v0":
-		bcReactor = bcv0.NewBlockchainReactor(state.Copy(), blockExec, blockStore, fastSync)
-	case "v1":
-		bcReactor = bcv1.NewBlockchainReactor(state.Copy(), blockExec, blockStore, fastSync)
-	case "v2":
-		bcReactor = bcv2.NewBlockchainReactor(state.Copy(), blockExec, blockStore, fastSync)
+		bcReactor = bcv0.NewBlockchainReactor(stateCopyMap, blockExecMap, blockStoreMap, fastSyncMap)
+//YITODO: We'll consider the following 2 cases later
+//	case "v1":
+//		bcReactor = bcv1.NewBlockchainReactor(stateCopyMap, blockExecMap, blockStoreMap, fastSyncMap)
+//	case "v2":
+//		bcReactor = bcv2.NewBlockchainReactor(stateCopyMap, blockExecMap, blockStoreMap, fastSyncMap)
 	default:
 		return nil, fmt.Errorf("unknown fastsync version %s", config.FastSync.Version)
 	}
@@ -422,36 +493,54 @@ func createBlockchainReactor(config *cfg.Config,
 }
 
 func createConsensusReactor(config *cfg.Config,
-	state sm.State,
-	blockExec *sm.BlockExecutor,
-	blockStore sm.BlockStore,
-	mempool *mempl.CListMempool,
-	evidencePool *evidence.Pool,
+	stateMap map[string]sm.State,
+	blockExecMap map[string]*sm.BlockExecutor,
+	blockStoreMap map[string]sm.BlockStore,
+	mempoolMap map[string]*mempl.CListMempool,
+	evidencePoolMap map[string]*evidence.Pool,
 	privValidator types.PrivValidator,
 	csMetrics *cs.Metrics,
-	waitSync bool,
+	waitSyncMap map[string]bool,
 	eventBus *types.EventBus,
-	consensusLogger log.Logger) (*cs.Reactor, *cs.State) {
+	consensusLogger log.Logger) (*cs.Reactor, map[string]*cs.State) {
 
-	consensusState := cs.NewState(
-		config.Consensus,
-		state.Copy(),
-		blockExec,
-		blockStore,
-		mempool,
-		evidencePool,
-		cs.StateMetrics(csMetrics),
-	)
-	consensusState.SetLogger(consensusLogger)
-	if privValidator != nil {
-		consensusState.SetPrivValidator(privValidator)
+	consensusStateMap := make(map[string]*cs.State)
+	for chainID, state := range stateMap {
+		blockExec, found := blockExecMap[chainID]; if !found {
+			panic("failed to get blockExec")	//TODO: make a better error out 
+		}
+		blockStore, found := blockStoreMap[chainID]; if !found {
+			panic("failed to get blockStore")	//TODO: make a better error out 
+		}
+		mempool, found := mempoolMap[chainID]; if !found {
+			panic("failed to get mempool")		//TODO: make a better error out 
+		}
+		evidencePool, found := evidencePoolMap[chainID]; if !found {
+			panic("failed to get evidencePool")	//TODO: make a better error out 
+		}
+
+		consensusState := cs.NewState(
+			config.Consensus,
+			state.Copy(),
+			blockExec,
+			blockStore,
+			mempool,
+			evidencePool,
+			cs.StateMetrics(csMetrics),
+		)
+		consensusState.SetLogger(consensusLogger)
+		if privValidator != nil {
+			consensusState.SetPrivValidator(privValidator)
+		}
+		consensusStateMap[chainID] = consensusState
 	}
-	consensusReactor := cs.NewReactor(consensusState, waitSync, cs.ReactorMetrics(csMetrics))
+
+	consensusReactor := cs.NewReactor(consensusStateMap, waitSyncMap, cs.ReactorMetrics(csMetrics))
 	consensusReactor.SetLogger(consensusLogger)
 	// services which will be publishing and/or subscribing for messages (events)
 	// consensusReactor will set it on consensusState and blockExecutor
 	consensusReactor.SetEventBus(eventBus)
-	return consensusReactor, consensusState
+	return consensusReactor, consensusStateMap
 }
 
 func createTransport(
@@ -607,16 +696,20 @@ func createPEXReactorAndAddToSwitch(addrBook pex.AddrBook, config *cfg.Config,
 // startStateSync starts an asynchronous state sync process, then switches to fast sync mode.
 func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reactor,
 	stateProvider statesync.StateProvider, config *cfg.StateSyncConfig, fastSync bool,
-	stateStore sm.Store, blockStore *store.BlockStore, state sm.State) error {
+	stateStoreMap map[string]sm.Store, blockStoreMap map[string]*store.BlockStore,
+	stateMap map[string]sm.State, chainID string) error {
 	ssR.Logger.Info("Starting state sync")
 
+	state, found := stateMap[chainID]; if !found {
+		return fmt.Errorf("failed to retrieve state for chainID %s", chainID)
+	}
 	if stateProvider == nil {
 		var err error
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		stateProvider, err = statesync.NewLightClientStateProvider(
 			ctx,
-			state.ChainID, state.Version, state.InitialHeight,
+			chainID, state.Version, state.InitialHeight,
 			config.RPCServers, light.TrustOptions{
 				Period: config.TrustPeriod,
 				Height: config.TrustHeight,
@@ -625,6 +718,13 @@ func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reacto
 		if err != nil {
 			return fmt.Errorf("failed to set up light client state provider: %w", err)
 		}
+	}
+
+	stateStore, found := stateStoreMap[chainID]; if ! found {
+		return fmt.Errorf("failed to retrieve stateStore for chainID %s", chainID)
+	}
+	blockStore, found := blockStoreMap[chainID]; if ! found {
+		return fmt.Errorf("failed to retrieve blockStore for chainID %s", chainID)
 	}
 
 	go func() {
@@ -671,14 +771,25 @@ func NewNode(config *cfg.Config,
 	logger log.Logger,
 	options ...Option) (*Node, error) {
 
-	blockStore, stateDB, err := initDBs(config, dbProvider)
+	allChainIDs, err := config.GetAllChainIDs()
 	if err != nil {
 		return nil, err
 	}
 
-	stateStore := sm.NewStore(stateDB)
+	blockStoreMap, stateDBMap, err := initDBs(config, dbProvider, allChainIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	state, genDoc, err := LoadStateFromDBOrGenesisDocProvider(stateDB, genesisDocProvider)
+	stateStoreMap := make(map[string]sm.Store)
+	for _, chainID := range(allChainIDs) {
+		if stateDB, found := stateDBMap[chainID]; found {
+			stateStore := sm.NewStore(stateDB)
+			stateStoreMap[chainID] = stateStore
+		}
+	}
+
+	stateMap, genDocMap, err := LoadStateFromDBOrGenesisDocProvider(stateDBMap, genesisDocProvider, allChainIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -698,8 +809,8 @@ func NewNode(config *cfg.Config,
 		return nil, err
 	}
 
-	indexerService, txIndexer, blockIndexer, err := createAndStartIndexerService(config,
-		genDoc.ChainID, dbProvider, eventBus, logger)
+	indexerServiceMap, txIndexerMap, blockIndexerMap, err := createAndStartIndexerService(config,
+		allChainIDs, dbProvider, eventBus, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -707,11 +818,7 @@ func NewNode(config *cfg.Config,
 	// If an address is provided, listen on the socket for a connection from an
 	// external signing process.
 	if config.PrivValidatorListenAddr != "" {
-		// FIXME: we should start services inside OnStart
-		privValidator, err = createAndStartPrivValidatorSocketClient(config.PrivValidatorListenAddr, genDoc.ChainID, logger)
-		if err != nil {
-			return nil, fmt.Errorf("error with private validator socket client: %w", err)
-		}
+		// Do nothing, we don't support it for now
 	}
 
 	pubKey, err := privValidator.GetPubKey()
@@ -719,73 +826,133 @@ func NewNode(config *cfg.Config,
 		return nil, fmt.Errorf("can't get pubkey: %w", err)
 	}
 
-	// Determine whether we should attempt state sync.
-	stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
-	if stateSync && state.LastBlockHeight > 0 {
-		logger.Info("Found local state with non-zero height, skipping state sync")
-		stateSync = false
-	}
-
-	// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
-	// and replays any blocks as necessary to sync tendermint with the app.
+	stateSyncMap := make(map[string]bool)
 	consensusLogger := logger.With("module", "consensus")
-	if !stateSync {
-		if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
-			return nil, err
+
+	// TODO: maybe it's better to do the following for loop iterations concurrently
+	for _, chainID := range(allChainIDs) {
+		state, found := stateMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get state!")
 		}
 
-		// Reload the state. It will have the Version.Consensus.App set by the
-		// Handshake, and may have other modifications as well (ie. depending on
-		// what happened during block replay).
-		state, err = stateStore.Load()
-		if err != nil {
-			return nil, fmt.Errorf("cannot load state: %w", err)
+		// Determine whether we should attempt state sync.
+		stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
+		if stateSync && state.LastBlockHeight > 0 {
+			logger.Info("Found local state with non-zero height, skipping state sync")
+			stateSync = false
 		}
+		stateSyncMap[chainID] = stateSync
+
+		stateStore, found := stateStoreMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get stateStore!")
+		}
+
+		blockStore, found := blockStoreMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get blockStore!")
+		}
+
+		genDoc, found := genDocMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get genDoc!")
+		}
+
+
+		// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
+		// and replays any blocks as necessary to sync tendermint with the app.
+		if !stateSync {
+			if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+				return nil, err
+			}
+
+			// Reload the state. It will have the Version.Consensus.App set by the
+			// Handshake, and may have other modifications as well (ie. depending on
+			// what happened during block replay).
+			state, err = stateStore.Load()
+			if err != nil {
+				return nil, fmt.Errorf("cannot load state: %w", err)
+			}
+			stateMap[chainID] = state
+		}
+
+		logNodeStartupInfo(state, pubKey, logger, consensusLogger)
 	}
 
-	// Determine whether we should do fast sync. This must happen after the handshake, since the
-	// app may modify the validator set, specifying ourself as the only validator.
-	fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
-
-	logNodeStartupInfo(state, pubKey, logger, consensusLogger)
-
-	csMetrics, p2pMetrics, memplMetrics, smMetrics := metricsProvider(genDoc.ChainID)
+	// TODO: Let's handle Metrics later. For now it's just NopMetrics
+	csMetrics, p2pMetrics, memplMetrics, smMetrics := metricsProvider("fake-chain-id")
 
 	// Make MempoolReactor
-	mempoolReactor, mempool := createMempoolAndMempoolReactor(config, proxyApp, state, memplMetrics, logger)
+	mempoolReactor, mempoolMap := createMempoolAndMempoolReactor(config, proxyApp, stateMap, memplMetrics, logger)
+
 
 	// Make Evidence Reactor
-	evidenceReactor, evidencePool, err := createEvidenceReactor(config, dbProvider, stateDB, blockStore, logger)
+	evidenceReactor, evidencePoolMap, err := createEvidenceReactor(config, dbProvider, stateDBMap, blockStoreMap, logger)
 	if err != nil {
 		return nil, err
 	}
 
+	evidencePoolInterfaceMap := make(map[string]sm.EvidencePool, len(evidencePoolMap))
+	for k, v := range evidencePoolMap {
+		evidencePoolInterfaceMap[k] = v
+	}
+
 	// make block executor for consensus and blockchain reactors to execute blocks
-	blockExec := sm.NewBlockExecutor(
-		stateStore,
+	blockExecMap := sm.NewBlockExecutor(
+		stateStoreMap,
 		logger.With("module", "state"),
 		proxyApp.Consensus(),
-		mempool,
-		evidencePool,
+		mempoolMap,
+		evidencePoolInterfaceMap,
 		sm.BlockExecutorWithMetrics(smMetrics),
 	)
 
+	fastSyncMap := make(map[string]bool)
+	newFastSyncMap := make(map[string]bool)
+	fastOrStateSyncMap := make(map[string]bool)
+
+	for _, chainID := range(allChainIDs) {
+		state, found := stateMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get state!")
+		}
+		// Determine whether we should do fast sync. This must happen after the handshake, since the
+		// app may modify the validator set, specifying ourself as the only validator.
+		fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
+	
+		fastSyncMap[chainID] = fastSync
+		stateSync, found := stateSyncMap[chainID]
+		if !found {
+			return nil, errors.New("failed to get stateSync!")
+		}
+
+		newFastSyncMap[chainID] = fastSync && !stateSync
+		fastOrStateSyncMap[chainID] = stateSync || fastSync
+	}
+
 	// Make BlockchainReactor. Don't start fast sync if we're doing a state sync first.
-	bcReactor, err := createBlockchainReactor(config, state, blockExec, blockStore, fastSync && !stateSync, logger)
+	bcReactor, err := createBlockchainReactor(config, stateMap, blockExecMap, blockStoreMap, newFastSyncMap, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not create blockchain reactor: %w", err)
 	}
 
 	// Make ConsensusReactor. Don't enable fully if doing a state sync and/or fast sync first.
 	// FIXME We need to update metrics here, since other reactors don't have access to them.
-	if stateSync {
-		csMetrics.StateSyncing.Set(1)
-	} else if fastSync {
-		csMetrics.FastSyncing.Set(1)
+// No need to worry about csMetrics for now - Ethan
+//	if stateSync {
+//		csMetrics.StateSyncing.Set(1)
+//	} else if fastSync {
+//		csMetrics.FastSyncing.Set(1)
+//	}
+
+	blockStoreInterfaceMap := make(map[string]sm.BlockStore, len(blockStoreMap))
+	for k, v := range blockStoreMap {
+		blockStoreInterfaceMap[k] = v
 	}
-	consensusReactor, consensusState := createConsensusReactor(
-		config, state, blockExec, blockStore, mempool, evidencePool,
-		privValidator, csMetrics, stateSync || fastSync, eventBus, consensusLogger,
+	consensusReactor, consensusStateMap := createConsensusReactor(
+		config, stateMap, blockExecMap, blockStoreInterfaceMap, mempoolMap, evidencePoolMap,
+		privValidator, csMetrics, fastOrStateSyncMap, eventBus, consensusLogger,
 	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
@@ -800,7 +967,7 @@ func NewNode(config *cfg.Config,
 	)
 	stateSyncReactor.SetLogger(logger.With("module", "statesync"))
 
-	nodeInfo, err := makeNodeInfo(config, nodeKey, txIndexer, genDoc, state)
+	nodeInfo, err := makeNodeInfo(config, nodeKey, txIndexerMap, genDocMap, stateMap, allChainIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -854,9 +1021,13 @@ func NewNode(config *cfg.Config,
 		}()
 	}
 
+	mempoolInterfaceMap := make(map[string]mempl.Mempool, len(mempoolMap))
+	for k, v := range mempoolMap {
+		mempoolInterfaceMap[k] = v
+	}
 	node := &Node{
 		config:        config,
-		genesisDoc:    genDoc,
+		genesisDocMap: genDocMap,
 		privValidator: privValidator,
 
 		transport: transport,
@@ -865,23 +1036,24 @@ func NewNode(config *cfg.Config,
 		nodeInfo:  nodeInfo,
 		nodeKey:   nodeKey,
 
-		stateStore:       stateStore,
-		blockStore:       blockStore,
-		bcReactor:        bcReactor,
-		mempoolReactor:   mempoolReactor,
-		mempool:          mempool,
-		consensusState:   consensusState,
-		consensusReactor: consensusReactor,
-		stateSyncReactor: stateSyncReactor,
-		stateSync:        stateSync,
-		stateSyncGenesis: state, // Shouldn't be necessary, but need a way to pass the genesis state
-		pexReactor:       pexReactor,
-		evidencePool:     evidencePool,
-		proxyApp:         proxyApp,
-		txIndexer:        txIndexer,
-		indexerService:   indexerService,
-		blockIndexer:     blockIndexer,
-		eventBus:         eventBus,
+		stateStoreMap:     stateStoreMap,
+		blockStoreMap:     blockStoreMap,
+		bcReactor:         bcReactor,
+		mempoolReactor:    mempoolReactor,
+		mempoolMap:        mempoolInterfaceMap,
+		consensusStateMap: consensusStateMap,
+		consensusReactor:  consensusReactor,
+		stateSyncReactor:  stateSyncReactor,
+		stateSyncMap:      stateSyncMap,
+		stateSyncGenesisMap: stateMap, // Shouldn't be necessary, but need a way to pass the genesis state
+		pexReactor:        pexReactor,
+		evidencePoolMap:      evidencePoolMap,
+		proxyApp:          proxyApp,
+		txIndexerMap:      txIndexerMap,
+		indexerServiceMap: indexerServiceMap,
+		blockIndexerMap:   blockIndexerMap,
+		eventBus:          eventBus,
+		allChainIDs:       allChainIDs,
 	}
 	node.BaseService = *service.NewBaseService(logger, "Node", node)
 
@@ -895,10 +1067,12 @@ func NewNode(config *cfg.Config,
 // OnStart starts the Node. It implements service.Service.
 func (n *Node) OnStart() error {
 	now := tmtime.Now()
-	genTime := n.genesisDoc.GenesisTime
-	if genTime.After(now) {
-		n.Logger.Info("Genesis time is in the future. Sleeping until then...", "genTime", genTime)
-		time.Sleep(genTime.Sub(now))
+	for _, genDoc := range n.genesisDocMap {
+		genTime := genDoc.GenesisTime
+		if genTime.After(now) {
+			n.Logger.Info("Genesis time is in the future. Sleeping until then...", "genTime", genTime)
+			time.Sleep(genTime.Sub(now))
+		}
 	}
 
 	// Add private IDs to addrbook to block those peers being added
@@ -931,9 +1105,11 @@ func (n *Node) OnStart() error {
 	n.isListening = true
 
 	if n.config.Mempool.WalEnabled() {
-		err = n.mempool.InitWAL()
-		if err != nil {
-			return fmt.Errorf("init mempool WAL: %w", err)
+		for _, mempool := range n.mempoolMap {
+			err = mempool.InitWAL()
+			if err != nil {
+				return fmt.Errorf("init mempool WAL: %w", err)
+			}
 		}
 	}
 
@@ -950,15 +1126,17 @@ func (n *Node) OnStart() error {
 	}
 
 	// Run state sync
-	if n.stateSync {
-		bcR, ok := n.bcReactor.(fastSyncReactor)
-		if !ok {
-			return fmt.Errorf("this blockchain reactor does not support switching from state sync")
-		}
-		err := startStateSync(n.stateSyncReactor, bcR, n.consensusReactor, n.stateSyncProvider,
-			n.config.StateSync, n.config.FastSyncMode, n.stateStore, n.blockStore, n.stateSyncGenesis)
-		if err != nil {
-			return fmt.Errorf("failed to start state sync: %w", err)
+	for chainID, stateSync := range n.stateSyncMap {
+		if stateSync {
+			bcR, ok := n.bcReactor.(fastSyncReactor)
+			if !ok {
+				return fmt.Errorf("this blockchain reactor does not support switching from state sync")
+			}
+			err := startStateSync(n.stateSyncReactor, bcR, n.consensusReactor, n.stateSyncProvider,
+				n.config.StateSync, n.config.FastSyncMode, n.stateStoreMap, n.blockStoreMap, n.stateSyncGenesisMap, chainID)
+			if err != nil {
+				return fmt.Errorf("failed to start state sync: %w", err)
+			}
 		}
 	}
 
@@ -975,8 +1153,10 @@ func (n *Node) OnStop() {
 	if err := n.eventBus.Stop(); err != nil {
 		n.Logger.Error("Error closing eventBus", "err", err)
 	}
-	if err := n.indexerService.Stop(); err != nil {
-		n.Logger.Error("Error closing indexerService", "err", err)
+	for _, indexerService := range n.indexerServiceMap {
+		if err := indexerService.Stop(); err != nil {
+			n.Logger.Error("Error closing indexerService", "err", err)
+		}
 	}
 
 	// now stop the reactors
@@ -986,7 +1166,9 @@ func (n *Node) OnStop() {
 
 	// stop mempool WAL
 	if n.config.Mempool.WalEnabled() {
-		n.mempool.CloseWAL()
+		for _, mempool := range n.mempoolMap {
+			mempool.CloseWAL()
+		}
 	}
 
 	if err := n.transport.Close(); err != nil {
@@ -1015,14 +1197,18 @@ func (n *Node) OnStop() {
 			n.Logger.Error("Prometheus HTTP server Shutdown", "err", err)
 		}
 	}
-	if n.blockStore != nil {
-		if err := n.blockStore.Close(); err != nil {
-			n.Logger.Error("problem closing blockstore", "err", err)
+	if n.blockStoreMap != nil {
+		for _, blockStore := range n.blockStoreMap {
+			if err := blockStore.Close(); err != nil {
+				n.Logger.Error("problem closing blockstore", "err", err)
+			}
 		}
 	}
-	if n.stateStore != nil {
-		if err := n.stateStore.Close(); err != nil {
-			n.Logger.Error("problem closing statestore", "err", err)
+	if n.stateStoreMap != nil {
+		for _, stateStore := range n.stateStoreMap {
+			if err := stateStore.Close(); err != nil {
+				n.Logger.Error("problem closing statestore", "err", err)
+			}
 		}
 	}
 }
@@ -1033,24 +1219,39 @@ func (n *Node) ConfigureRPC() error {
 	if err != nil {
 		return fmt.Errorf("can't get pubkey: %w", err)
 	}
+
+        blockStoreInterfaceMap := make(map[string]sm.BlockStore, len(n.blockStoreMap))
+        for k, v := range n.blockStoreMap {
+                blockStoreInterfaceMap[k] = v
+        }
+
+	evidencePoolInterfaceMap := make(map[string]sm.EvidencePool, len(n.evidencePoolMap))
+	for k, v := range n.evidencePoolMap {
+		evidencePoolInterfaceMap[k] = v
+	}
+
+	consensusStateInterfaceMap := make(map[string]rpccore.Consensus, len(n.consensusStateMap))
+	for k, v := range n.consensusStateMap {
+		consensusStateInterfaceMap[k] = v
+	}
 	rpccore.SetEnvironment(&rpccore.Environment{
 		ProxyAppQuery:   n.proxyApp.Query(),
 		ProxyAppMempool: n.proxyApp.Mempool(),
 
-		StateStore:     n.stateStore,
-		BlockStore:     n.blockStore,
-		EvidencePool:   n.evidencePool,
-		ConsensusState: n.consensusState,
-		P2PPeers:       n.sw,
-		P2PTransport:   n,
+		StateStoreMap:     n.stateStoreMap,
+		BlockStoreMap:     blockStoreInterfaceMap,
+		EvidencePoolMap:   evidencePoolInterfaceMap,
+		ConsensusStateMap: consensusStateInterfaceMap,
+		P2PPeers:          n.sw,
+		P2PTransport:      n,
 
 		PubKey:           pubKey,
-		GenDoc:           n.genesisDoc,
-		TxIndexer:        n.txIndexer,
-		BlockIndexer:     n.blockIndexer,
+		GenDocMap:        n.genesisDocMap,
+		TxIndexerMap:     n.txIndexerMap,
+		BlockIndexerMap:  n.blockIndexerMap,
 		ConsensusReactor: n.consensusReactor,
 		EventBus:         n.eventBus,
-		Mempool:          n.mempool,
+		MempoolMap:       n.mempoolMap,
 
 		Logger: n.Logger.With("module", "rpc"),
 
@@ -1209,13 +1410,13 @@ func (n *Node) Switch() *p2p.Switch {
 }
 
 // BlockStore returns the Node's BlockStore.
-func (n *Node) BlockStore() *store.BlockStore {
-	return n.blockStore
+func (n *Node) BlockStoreMap() map[string]*store.BlockStore {
+	return n.blockStoreMap
 }
 
 // ConsensusState returns the Node's ConsensusState.
-func (n *Node) ConsensusState() *cs.State {
-	return n.consensusState
+func (n *Node) ConsensusStateMap() map[string]*cs.State {
+	return n.consensusStateMap
 }
 
 // ConsensusReactor returns the Node's ConsensusReactor.
@@ -1229,8 +1430,8 @@ func (n *Node) MempoolReactor() *mempl.Reactor {
 }
 
 // Mempool returns the Node's mempool.
-func (n *Node) Mempool() mempl.Mempool {
-	return n.mempool
+func (n *Node) MempoolMap() map[string]mempl.Mempool {
+	return n.mempoolMap
 }
 
 // PEXReactor returns the Node's PEXReactor. It returns nil if PEX is disabled.
@@ -1239,8 +1440,8 @@ func (n *Node) PEXReactor() *pex.Reactor {
 }
 
 // EvidencePool returns the Node's EvidencePool.
-func (n *Node) EvidencePool() *evidence.Pool {
-	return n.evidencePool
+func (n *Node) EvidencePoolMap() map[string]*evidence.Pool {
+	return n.evidencePoolMap
 }
 
 // EventBus returns the Node's EventBus.
@@ -1255,8 +1456,8 @@ func (n *Node) PrivValidator() types.PrivValidator {
 }
 
 // GenesisDoc returns the Node's GenesisDoc.
-func (n *Node) GenesisDoc() *types.GenesisDoc {
-	return n.genesisDoc
+func (n *Node) GenesisDocMap() map[string]*types.GenesisDoc {
+	return n.genesisDocMap
 }
 
 // ProxyApp returns the Node's AppConns, representing its connections to the ABCI application.
@@ -1289,26 +1490,35 @@ func (n *Node) NodeInfo() p2p.NodeInfo {
 func makeNodeInfo(
 	config *cfg.Config,
 	nodeKey *p2p.NodeKey,
-	txIndexer txindex.TxIndexer,
-	genDoc *types.GenesisDoc,
-	state sm.State,
+	txIndexerMap map[string]txindex.TxIndexer,
+	genDoc map[string]*types.GenesisDoc,
+	stateMap map[string]sm.State,
+	allChainIDs []string,
 ) (p2p.DefaultNodeInfo, error) {
-	txIndexerStatus := "on"
-	if _, ok := txIndexer.(*null.TxIndex); ok {
-		txIndexerStatus = "off"
+	txIndexerStatusMap := make(map[string]string)
+	for chainID, txIndexer := range txIndexerMap {
+		txIndexerStatus := "on"
+		if _, ok := txIndexer.(*null.TxIndex); ok {
+			txIndexerStatus = "off"
+		}
+		txIndexerStatusMap[chainID] = txIndexerStatus
 	}
 
 	var bcChannel byte
 	switch config.FastSync.Version {
 	case "v0":
 		bcChannel = bcv0.BlockchainChannel
-	case "v1":
-		bcChannel = bcv1.BlockchainChannel
-	case "v2":
-		bcChannel = bcv2.BlockchainChannel
+// YITODO: ignore v1 and v2 for now
+//	case "v1":
+//		bcChannel = bcv1.BlockchainChannel
+//	case "v2":
+//		bcChannel = bcv2.BlockchainChannel
 	default:
 		return p2p.DefaultNodeInfo{}, fmt.Errorf("unknown fastsync version %s", config.FastSync.Version)
 	}
+
+	aChainID := allChainIDs[0]
+	state := stateMap[aChainID]  // YI: randomly pick a state. All states should have the same version info
 
 	nodeInfo := p2p.DefaultNodeInfo{
 		ProtocolVersion: p2p.NewProtocolVersion(
@@ -1317,7 +1527,7 @@ func makeNodeInfo(
 			state.Version.Consensus.App,
 		),
 		DefaultNodeID: nodeKey.ID(),
-		Network:       genDoc.ChainID,
+		Network:       "genDoc.ChainID",       // YITODO: Network should be a parameter from configuration file
 		Version:       version.TMCoreSemVer,
 		Channels: []byte{
 			bcChannel,
@@ -1328,9 +1538,10 @@ func makeNodeInfo(
 		},
 		Moniker: config.Moniker,
 		Other: p2p.DefaultNodeInfoOther{
-			TxIndex:    txIndexerStatus,
+			TxIndexMap: txIndexerStatusMap,
 			RPCAddress: config.RPC.ListenAddress,
 		},
+		AllChainIDs: allChainIDs,
 	}
 
 	if config.P2P.PexReactor {
@@ -1359,13 +1570,41 @@ var (
 // database, or creates one using the given genesisDocProvider. On success this also
 // returns the genesis doc loaded through the given provider.
 func LoadStateFromDBOrGenesisDocProvider(
+	stateDBMap map[string]dbm.DB,
+	genesisDocProvider GenesisDocProvider,
+	allChainIDs []string,
+) (map[string]sm.State, map[string]*types.GenesisDoc, error) {
+	stateMap := make(map[string]sm.State)
+	genDocMap := make(map[string]*types.GenesisDoc)
+
+	for _, chainID := range(allChainIDs) {
+		db, found := stateDBMap[chainID]; if !found {
+			return stateMap, genDocMap, errors.New("failed to load state DB")   // TODO: make err message more specific
+		}
+		state, genDoc, err := LoadStateFromDBOrGenesisDocProviderRaw(
+			db,
+			genesisDocProvider,
+			chainID,
+		)
+		if err != nil {
+			return stateMap, genDocMap, err
+		}
+		stateMap[chainID] = state
+		genDocMap[chainID] = genDoc
+	}
+
+	return stateMap, genDocMap, nil
+}
+
+func LoadStateFromDBOrGenesisDocProviderRaw(
 	stateDB dbm.DB,
 	genesisDocProvider GenesisDocProvider,
+	chainID string,
 ) (sm.State, *types.GenesisDoc, error) {
 	// Get genesis doc
 	genDoc, err := loadGenesisDoc(stateDB)
 	if err != nil {
-		genDoc, err = genesisDocProvider()
+		genDoc, err = genesisDocProvider(chainID)
 		if err != nil {
 			return sm.State{}, nil, err
 		}

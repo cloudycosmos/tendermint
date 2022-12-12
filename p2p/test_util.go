@@ -267,7 +267,7 @@ func testNodeInfoWithNetwork(id ID, name, network string) NodeInfo {
 		Channels:        []byte{testCh},
 		Moniker:         name,
 		Other: DefaultNodeInfoOther{
-			TxIndex:    "on",
+			TxIndexMap:  map[string]string{"chainID-01":"on"},
 			RPCAddress: fmt.Sprintf("127.0.0.1:%d", getFreePort()),
 		},
 	}

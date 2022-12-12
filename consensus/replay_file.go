@@ -31,10 +31,16 @@ const (
 
 // replay the wal file
 func RunReplayFile(config cfg.BaseConfig, csConfig *cfg.ConsensusConfig, console bool) {
-	consensusState := newConsensusStateForReplay(config, csConfig)
+	chainIDs, err := config.GetAllChainIDs()
+	if err != nil {
+		panic(err)
+	}
+	for _, chainID := range chainIDs {
+		consensusState := newConsensusStateForReplay(config, csConfig, chainID)
 
-	if err := consensusState.ReplayFile(csConfig.WalFile(), console); err != nil {
-		tmos.Exit(fmt.Sprintf("Error during consensus replay: %v", err))
+		if err := consensusState.ReplayFile(csConfig.WalFile(), console); err != nil {
+			tmos.Exit(fmt.Sprintf("Error during consensus replay: %v", err))
+		}
 	}
 }
 
@@ -283,7 +289,7 @@ func (pb *playback) replayConsoleLoop() int {
 //--------------------------------------------------------------------------------
 
 // convenience for replay mode
-func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusConfig) *State {
+func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusConfig, chainID string) *State {
 	dbType := dbm.BackendType(config.DBBackend)
 	// Get BlockStore
 	blockStoreDB, err := dbm.NewDB("blockstore", dbType, config.DBDir())
@@ -298,7 +304,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 		tmos.Exit(err.Error())
 	}
 	stateStore := sm.NewStore(stateDB)
-	gdoc, err := sm.MakeGenesisDocFromFile(config.GenesisFile())
+	gdoc, err := sm.MakeGenesisDocFromFile(config.GenesisFile(chainID))
 	if err != nil {
 		tmos.Exit(err.Error())
 	}
@@ -328,7 +334,7 @@ func newConsensusStateForReplay(config cfg.BaseConfig, csConfig *cfg.ConsensusCo
 	}
 
 	mempool, evpool := emptyMempool{}, sm.EmptyEvidencePool{}
-	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
+	blockExec := sm.NewBlockExecutorRaw(stateStore, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
 
 	consensusState := NewState(csConfig, state.Copy(), blockExec,
 		blockStore, mempool, evpool)

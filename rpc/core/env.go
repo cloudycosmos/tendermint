@@ -78,28 +78,28 @@ type Environment struct {
 	ProxyAppMempool proxy.AppConnMempool
 
 	// interfaces defined in types and above
-	StateStore     sm.Store
-	BlockStore     sm.BlockStore
-	EvidencePool   sm.EvidencePool
-	ConsensusState Consensus
+	StateStoreMap     map[string]sm.Store
+	BlockStoreMap     map[string]sm.BlockStore
+	EvidencePoolMap   map[string]sm.EvidencePool
+	ConsensusStateMap map[string]Consensus
 	P2PPeers       peers
 	P2PTransport   transport
 
 	// objects
 	PubKey           crypto.PubKey
-	GenDoc           *types.GenesisDoc // cache the genesis structure
-	TxIndexer        txindex.TxIndexer
-	BlockIndexer     indexer.BlockIndexer
+	GenDocMap        map[string]*types.GenesisDoc // cache the genesis structure
+	TxIndexerMap     map[string]txindex.TxIndexer
+	BlockIndexerMap  map[string]indexer.BlockIndexer
 	ConsensusReactor *consensus.Reactor
 	EventBus         *types.EventBus // thread safe
-	Mempool          mempl.Mempool
+	MempoolMap       map[string]mempl.Mempool
 
 	Logger log.Logger
 
 	Config cfg.RPCConfig
 
 	// cache of chunked genesis data.
-	genChunks []string
+	genChunksMap map[string][]string
 }
 
 //----------------------------------------------
@@ -142,15 +142,20 @@ func validatePerPage(perPagePtr *int) int {
 // InitGenesisChunks configures the environment and should be called on service
 // startup.
 func InitGenesisChunks() error {
-	if env.genChunks != nil {
+	if env.genChunksMap != nil {
 		return nil
 	}
-
-	if env.GenDoc == nil {
-		return nil
+	
+	for chainID, genDoc := range env.GenDocMap {
+		if err := InitGenesisChunksRaw(chainID, genDoc); err != nil {
+			return err
+		}
 	}
+	return nil
+}
 
-	data, err := tmjson.Marshal(env.GenDoc)
+func InitGenesisChunksRaw(chainID string, genDoc *types.GenesisDoc) error {
+	data, err := tmjson.Marshal(genDoc)
 	if err != nil {
 		return err
 	}
@@ -162,7 +167,7 @@ func InitGenesisChunks() error {
 			end = len(data)
 		}
 
-		env.genChunks = append(env.genChunks, base64.StdEncoding.EncodeToString(data[i:end]))
+		env.genChunksMap[chainID] = append(env.genChunksMap[chainID], base64.StdEncoding.EncodeToString(data[i:end]))
 	}
 
 	return nil
@@ -178,7 +183,7 @@ func validateSkipCount(page, perPage int) int {
 }
 
 // latestHeight can be either latest committed or uncommitted (+1) height.
-func getHeight(latestHeight int64, heightPtr *int64) (int64, error) {
+func getHeight(chainID string, latestHeight int64, heightPtr *int64) (int64, error) {
 	if heightPtr != nil {
 		height := *heightPtr
 		if height <= 0 {
@@ -188,7 +193,7 @@ func getHeight(latestHeight int64, heightPtr *int64) (int64, error) {
 			return 0, fmt.Errorf("height %d must be less than or equal to the current blockchain height %d",
 				height, latestHeight)
 		}
-		base := env.BlockStore.Base()
+		base := env.BlockStoreMap[chainID].Base()
 		if height < base {
 			return 0, fmt.Errorf("height %d is not available, lowest height is %d",
 				height, base)
@@ -198,10 +203,10 @@ func getHeight(latestHeight int64, heightPtr *int64) (int64, error) {
 	return latestHeight, nil
 }
 
-func latestUncommittedHeight() int64 {
-	nodeIsSyncing := env.ConsensusReactor.WaitSync()
+func latestUncommittedHeight(chainID string) int64 {
+	nodeIsSyncing := env.ConsensusReactor.WaitSync(chainID)
 	if nodeIsSyncing {
-		return env.BlockStore.Height()
+		return env.BlockStoreMap[chainID].Height()
 	}
-	return env.BlockStore.Height() + 1
+	return env.BlockStoreMap[chainID].Height() + 1
 }

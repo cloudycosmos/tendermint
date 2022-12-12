@@ -95,6 +95,13 @@ func NewVoteSet(chainID string, height int64, round int32,
 	}
 }
 
+
+// Added by Yi. The name of GetChainID matches better
+// with other mothods in interface VoteSetReader
+func (voteSet *VoteSet) GetChainID() string {
+	return voteSet.chainID
+}
+
 func (voteSet *VoteSet) ChainID() string {
 	return voteSet.chainID
 }
@@ -684,4 +691,5 @@ type VoteSetReader interface {
 	BitArray() *bits.BitArray
 	GetByIndex(int32) *Vote
 	IsCommit() bool
+	GetChainID() string
 }

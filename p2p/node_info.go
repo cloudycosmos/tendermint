@@ -93,11 +93,14 @@ type DefaultNodeInfo struct {
 	// ASCIIText fields
 	Moniker string               `json:"moniker"` // arbitrary moniker
 	Other   DefaultNodeInfoOther `json:"other"`   // other application specific data
+
+	// Added by Yi
+	AllChainIDs []string         `json:"all_chain_ids"` // all chain_ids this node anticipates
 }
 
 // DefaultNodeInfoOther is the misc. applcation specific data
 type DefaultNodeInfoOther struct {
-	TxIndex    string `json:"tx_index"`
+	TxIndexMap map[string]string `json:"tx_index"`  // YI: txIndexerStatus: "on"/"off"
 	RPCAddress string `json:"rpc_address"`
 }
 
@@ -158,11 +161,12 @@ func (info DefaultNodeInfo) Validate() error {
 
 	// Validate Other.
 	other := info.Other
-	txIndex := other.TxIndex
-	switch txIndex {
-	case "", "on", "off":
-	default:
-		return fmt.Errorf("info.Other.TxIndex should be either 'on', 'off', or empty string, got '%v'", txIndex)
+	for _, txIndex := range other.TxIndexMap {
+		switch txIndex {
+		case "", "on", "off":
+		default:
+			return fmt.Errorf("info.Other.TxIndex should be either 'on', 'off', or empty string, got '%v'", txIndex)
+		}
 	}
 	// XXX: Should we be more strict about address formats?
 	rpcAddr := other.RPCAddress
@@ -243,7 +247,7 @@ func (info DefaultNodeInfo) ToProto() *tmp2p.DefaultNodeInfo {
 	dni.Channels = info.Channels
 	dni.Moniker = info.Moniker
 	dni.Other = tmp2p.DefaultNodeInfoOther{
-		TxIndex:    info.Other.TxIndex,
+		TxIndexMap: info.Other.TxIndexMap,
 		RPCAddress: info.Other.RPCAddress,
 	}
 
@@ -267,7 +271,7 @@ func DefaultNodeInfoFromToProto(pb *tmp2p.DefaultNodeInfo) (DefaultNodeInfo, err
 		Channels:      pb.Channels,
 		Moniker:       pb.Moniker,
 		Other: DefaultNodeInfoOther{
-			TxIndex:    pb.Other.TxIndex,
+			TxIndexMap:    pb.Other.TxIndexMap,
 			RPCAddress: pb.Other.RPCAddress,
 		},
 	}

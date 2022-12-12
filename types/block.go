@@ -749,6 +749,9 @@ type Commit struct {
 	// unmarshaling.
 	hash     tmbytes.HexBytes
 	bitArray *bits.BitArray
+
+	// Added by YI
+	chainID  string
 }
 
 // NewCommit returns a new Commit.
@@ -776,6 +779,11 @@ func CommitToVoteSet(chainID string, commit *Commit, vals *ValidatorSet) *VoteSe
 		}
 	}
 	return voteSet
+}
+
+// Added by Yi to make Commit of type VoteSetReader
+func (commit *Commit) GetChainID() string {
+	return commit.chainID
 }
 
 // GetVote converts the CommitSig for the given valIdx to a Vote.

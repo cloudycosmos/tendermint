@@ -836,3 +836,29 @@ func (sw *Switch) addPeer(p Peer) error {
 
 	return nil
 }
+
+
+// AllChainIDs returns all ChainIDs this node serves
+func (sw *Switch) AllChainIDs() []string {
+	nodeInfo := sw.nodeInfo.(DefaultNodeInfo)
+	return nodeInfo.AllChainIDs
+}
+
+var allChainIDsMap = make(map[string]struct{})
+
+// IsValidChainID verifies whether a ChainID is among
+// the AllChainIDs of the node
+func (sw *Switch) IsValidChainID(chainID string) bool {
+	if len(allChainIDsMap) == 0 {
+		allChainIDs := sw.AllChainIDs()
+		for _, tmpChainID := range allChainIDs {
+			allChainIDsMap[tmpChainID] = struct{}{}
+		}
+	}
+
+	if _, found := allChainIDsMap[chainID]; found {
+		return true
+	}
+
+	return false
+}

@@ -91,6 +91,9 @@ type RoundState struct {
 	LastCommit                *types.VoteSet      `json:"last_commit"`  // Last precommits at Height-1
 	LastValidators            *types.ValidatorSet `json:"last_validators"`
 	TriggeredTimeoutPrecommit bool                `json:"triggered_timeout_precommit"`
+
+	// Added by Yi
+	ChainID                   string              `json:"chain_id"`
 }
 
 // Compressed version of the RoundState for use in RPC
@@ -102,6 +105,9 @@ type RoundStateSimple struct {
 	ValidBlockHash    bytes.HexBytes      `json:"valid_block_hash"`
 	Votes             json.RawMessage     `json:"height_vote_set"`
 	Proposer          types.ValidatorInfo `json:"proposer"`
+
+	// Added by Yi
+	ChainID           string              `json:"chain_id"`
 }
 
 // Compress the RoundState to RoundStateSimple

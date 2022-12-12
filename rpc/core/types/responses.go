@@ -99,11 +99,11 @@ type ResultStatus struct {
 }
 
 // Is TxIndexing enabled
-func (s *ResultStatus) TxIndexEnabled() bool {
+func (s *ResultStatus) TxIndexEnabled(chainID string) bool {
 	if s == nil {
 		return false
 	}
-	return s.NodeInfo.Other.TxIndex == "on"
+	return s.NodeInfo.Other.TxIndexMap[chainID] == "on"
 }
 
 // Info about peer connections

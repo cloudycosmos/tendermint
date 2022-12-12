@@ -76,11 +76,14 @@ type BlockPool struct {
 
 	requestsCh chan<- BlockRequest
 	errorsCh   chan<- peerError
+
+	// added by YI
+	chainID    string  // bcR has multiple BlockPools and each BlockPool for a ChainID
 }
 
 // NewBlockPool returns a new BlockPool with the height equal to start. Block
 // requests and errors will be sent to requestsCh and errorsCh accordingly.
-func NewBlockPool(start int64, requestsCh chan<- BlockRequest, errorsCh chan<- peerError) *BlockPool {
+func NewBlockPool(start int64, requestsCh chan<- BlockRequest, errorsCh chan<- peerError, chainID string) *BlockPool {
 	bp := &BlockPool{
 		peers: make(map[p2p.ID]*bpPeer),
 
@@ -90,6 +93,8 @@ func NewBlockPool(start int64, requestsCh chan<- BlockRequest, errorsCh chan<- p
 
 		requestsCh: requestsCh,
 		errorsCh:   errorsCh,
+
+		chainID:    chainID,
 	}
 	bp.BaseService = *service.NewBaseService(nil, "BlockPool", bp)
 	return bp
@@ -399,7 +404,7 @@ func (pool *BlockPool) sendRequest(height int64, peerID p2p.ID) {
 	if !pool.IsRunning() {
 		return
 	}
-	pool.requestsCh <- BlockRequest{height, peerID}
+	pool.requestsCh <- BlockRequest{height, peerID, pool.chainID}
 }
 
 func (pool *BlockPool) sendError(err error, peerID p2p.ID) {
@@ -644,4 +649,5 @@ OUTER_LOOP:
 type BlockRequest struct {
 	Height int64
 	PeerID p2p.ID
+	ChainID string
 }

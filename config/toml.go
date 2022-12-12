@@ -520,7 +520,7 @@ func ResetTestRootWithChainID(testName string, chainID string) *Config {
 
 	baseConfig := DefaultBaseConfig()
 	configFilePath := filepath.Join(rootDir, defaultConfigFilePath)
-	genesisFilePath := filepath.Join(rootDir, baseConfig.Genesis)
+	genesisDir := filepath.Join(rootDir, baseConfig.GenesisDir)
 	privKeyFilePath := filepath.Join(rootDir, baseConfig.PrivValidatorKey)
 	privStateFilePath := filepath.Join(rootDir, baseConfig.PrivValidatorState)
 
@@ -528,12 +528,16 @@ func ResetTestRootWithChainID(testName string, chainID string) *Config {
 	if !tmos.FileExists(configFilePath) {
 		writeDefaultConfigFile(configFilePath)
 	}
-	if !tmos.FileExists(genesisFilePath) {
+	matches, err := filepath.Glob(genesisDir + "/*.json")
+	if err != nil {
+		panic(err)
+	}
+	if len(matches) == 0 {
 		if chainID == "" {
 			chainID = "tendermint_test"
 		}
 		testGenesis := fmt.Sprintf(testGenesisFmt, chainID)
-		tmos.MustWriteFile(genesisFilePath, []byte(testGenesis), 0644)
+		tmos.MustWriteFile(filepath.Join(genesisDir, chainID + ".json"), []byte(testGenesis), 0644)
 	}
 	// we always overwrite the priv val
 	tmos.MustWriteFile(privKeyFilePath, []byte(testPrivValidatorKey), 0644)

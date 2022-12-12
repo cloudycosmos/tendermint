@@ -19,7 +19,8 @@ func (bapi *broadcastAPI) Ping(ctx context.Context, req *RequestPing) (*Response
 func (bapi *broadcastAPI) BroadcastTx(ctx context.Context, req *RequestBroadcastTx) (*ResponseBroadcastTx, error) {
 	// NOTE: there's no way to get client's remote address
 	// see https://stackoverflow.com/questions/33684570/session-and-remote-ip-address-in-grpc-go
-	res, err := core.BroadcastTxCommit(&rpctypes.Context{}, req.Tx)
+	chainID := "fake-chain-id"  // YITODO: we need to get the chainID in a different way
+	res, err := core.BroadcastTxCommit(&rpctypes.Context{}, chainID, req.Tx)
 	if err != nil {
 		return nil, err
 	}

@@ -53,6 +53,40 @@ func BlockExecutorWithMetrics(metrics *Metrics) BlockExecutorOption {
 // NewBlockExecutor returns a new BlockExecutor with a NopEventBus.
 // Call SetEventBus to provide one.
 func NewBlockExecutor(
+	stateStoreMap map[string]Store,
+	logger log.Logger,
+	proxyApp proxy.AppConnConsensus,
+	mempoolMap map[string]*mempl.CListMempool,
+	evpoolMap map[string]EvidencePool,
+	options ...BlockExecutorOption,
+) map[string]*BlockExecutor {
+	blockExecutorMap := make(map[string]*BlockExecutor)
+	for chainID, stateStore := range stateStoreMap {
+		mempool, found := mempoolMap[chainID]
+		if !found {
+			return map[string]*BlockExecutor{}
+		}
+		evpool, found := evpoolMap[chainID]
+		if !found {
+			return map[string]*BlockExecutor{}
+		}
+
+		res := NewBlockExecutorRaw(
+			stateStore,
+			logger,
+			proxyApp,
+			mempool,
+			evpool,
+			options...
+		)
+
+		blockExecutorMap[chainID] = res
+	}
+
+	return blockExecutorMap
+}
+
+func NewBlockExecutorRaw(
 	stateStore Store,
 	logger log.Logger,
 	proxyApp proxy.AppConnConsensus,

@@ -13,7 +13,7 @@ import (
 // Status returns Tendermint status including node info, pubkey, latest block
 // hash, app hash, block height and time.
 // More: https://docs.tendermint.com/master/rpc/#/Info/status
-func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
+func Status(ctx *rpctypes.Context, chainID string) (*ctypes.ResultStatus, error) {
 	var (
 		earliestBlockHeight   int64
 		earliestBlockHash     tmbytes.HexBytes
@@ -21,7 +21,7 @@ func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
 		earliestBlockTimeNano int64
 	)
 
-	if earliestBlockMeta := env.BlockStore.LoadBaseMeta(); earliestBlockMeta != nil {
+	if earliestBlockMeta := env.BlockStoreMap[chainID].LoadBaseMeta(); earliestBlockMeta != nil {
 		earliestBlockHeight = earliestBlockMeta.Header.Height
 		earliestAppHash = earliestBlockMeta.Header.AppHash
 		earliestBlockHash = earliestBlockMeta.BlockID.Hash
@@ -33,11 +33,11 @@ func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
 		latestAppHash       tmbytes.HexBytes
 		latestBlockTimeNano int64
 
-		latestHeight = env.BlockStore.Height()
+		latestHeight = env.BlockStoreMap[chainID].Height()
 	)
 
 	if latestHeight != 0 {
-		if latestBlockMeta := env.BlockStore.LoadBlockMeta(latestHeight); latestBlockMeta != nil {
+		if latestBlockMeta := env.BlockStoreMap[chainID].LoadBlockMeta(latestHeight); latestBlockMeta != nil {
 			latestBlockHash = latestBlockMeta.BlockID.Hash
 			latestAppHash = latestBlockMeta.Header.AppHash
 			latestBlockTimeNano = latestBlockMeta.Header.Time.UnixNano()
@@ -47,7 +47,7 @@ func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
 	// Return the very last voting power, not the voting power of this validator
 	// during the last block.
 	var votingPower int64
-	if val := validatorAtHeight(latestUncommittedHeight()); val != nil {
+	if val := validatorAtHeight(chainID, latestUncommittedHeight(chainID)); val != nil {
 		votingPower = val.VotingPower
 	}
 
@@ -62,7 +62,8 @@ func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
 			EarliestAppHash:     earliestAppHash,
 			EarliestBlockHeight: earliestBlockHeight,
 			EarliestBlockTime:   time.Unix(0, earliestBlockTimeNano),
-			CatchingUp:          env.ConsensusReactor.WaitSync(),
+			CatchingUp:          env.ConsensusReactor.WaitSync(chainID),
+
 		},
 		ValidatorInfo: ctypes.ValidatorInfo{
 			Address:     env.PubKey.Address(),
@@ -74,8 +75,8 @@ func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
 	return result, nil
 }
 
-func validatorAtHeight(h int64) *types.Validator {
-	vals, err := env.StateStore.LoadValidators(h)
+func validatorAtHeight(chainID string, h int64) *types.Validator {
+	vals, err := env.StateStoreMap[chainID].LoadValidators(h)
 	if err != nil {
 		return nil
 	}
