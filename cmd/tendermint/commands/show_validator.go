@@ -8,6 +8,8 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
+
+	"github.com/cosmos/cosmos-sdk/client/flags"
 )
 
 // ShowValidatorCmd adds capabilities for showing the validator info.
@@ -25,7 +27,7 @@ func showValidator(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("private validator file %s does not exist", keyFilePath)
 	}
 
-	chainID := "fake-chain-id-28"  // YITODO: need a better chainID
+	chainID, _ := cmd.Flags().GetString(flags.FlagChainID)
 	pv := privval.LoadFilePV(keyFilePath, config.PrivValidatorStateFile(chainID))
 
 	pubKey, err := pv.GetPubKey()
