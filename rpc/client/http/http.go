@@ -201,9 +201,10 @@ func (b *BatchHTTP) Count() int {
 //-----------------------------------------------------------------------------
 // baseRPCClient
 
-func (c *baseRPCClient) Status(ctx context.Context, chainId string) (*ctypes.ResultStatus, error) {
+func (c *baseRPCClient) Status(ctx context.Context) (*ctypes.ResultStatus, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultStatus)
-	_, err := c.caller.Call(ctx, "status", map[string]interface{}{"chain_id": chainId}, result)
+	_, err := c.caller.Call(ctx, "status", map[string]interface{}{"chain_id": chainID}, result)
 	if err != nil {
 		return nil, err
 	}
@@ -223,22 +224,21 @@ func (c *baseRPCClient) ABCIInfo(ctx context.Context) (*ctypes.ResultABCIInfo, e
 
 func (c *baseRPCClient) ABCIQuery(
 	ctx context.Context,
-	chainId string,
 	path string,
 	data bytes.HexBytes,
 ) (*ctypes.ResultABCIQuery, error) {
-	return c.ABCIQueryWithOptions(ctx, chainId, path, data, rpcclient.DefaultABCIQueryOptions)
+	return c.ABCIQueryWithOptions(ctx, path, data, rpcclient.DefaultABCIQueryOptions)
 }
 
 func (c *baseRPCClient) ABCIQueryWithOptions(
 	ctx context.Context,
-	chainId string,
 	path string,
 	data bytes.HexBytes,
 	opts rpcclient.ABCIQueryOptions) (*ctypes.ResultABCIQuery, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultABCIQuery)
 	_, err := c.caller.Call(ctx, "abci_query",
-		map[string]interface{}{"chain_id": chainId, "path": path, "data": data, "height": opts.Height, "prove": opts.Prove},
+		map[string]interface{}{"chain_id": chainID, "path": path, "data": data, "height": opts.Height, "prove": opts.Prove},
 		result)
 	if err != nil {
 		return nil, err
@@ -288,12 +288,12 @@ func (c *baseRPCClient) broadcastTX(
 
 func (c *baseRPCClient) UnconfirmedTxs(
 	ctx context.Context,
-	chainId string,
 	limit *int,
 ) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultUnconfirmedTxs)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 
 	if limit != nil {
 		params["limit"] = limit
@@ -305,9 +305,10 @@ func (c *baseRPCClient) UnconfirmedTxs(
 	return result, nil
 }
 
-func (c *baseRPCClient) NumUnconfirmedTxs(ctx context.Context, chainId string) (*ctypes.ResultUnconfirmedTxs, error) {
+func (c *baseRPCClient) NumUnconfirmedTxs(ctx context.Context) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultUnconfirmedTxs)
-	_, err := c.caller.Call(ctx, "num_unconfirmed_txs", map[string]interface{}{"chain_id": chainId}, result)
+	_, err := c.caller.Call(ctx, "num_unconfirmed_txs", map[string]interface{}{"chain_id": chainID}, result)
 	if err != nil {
 		return nil, err
 	}
@@ -332,18 +333,20 @@ func (c *baseRPCClient) NetInfo(ctx context.Context) (*ctypes.ResultNetInfo, err
 	return result, nil
 }
 
-func (c *baseRPCClient) DumpConsensusState(ctx context.Context, chainId string) (*ctypes.ResultDumpConsensusState, error) {
+func (c *baseRPCClient) DumpConsensusState(ctx context.Context) (*ctypes.ResultDumpConsensusState, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultDumpConsensusState)
-	_, err := c.caller.Call(ctx, "dump_consensus_state", map[string]interface{}{"chain_id": chainId}, result)
+	_, err := c.caller.Call(ctx, "dump_consensus_state", map[string]interface{}{"chain_id": chainID}, result)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (c *baseRPCClient) ConsensusState(ctx context.Context, chainId string) (*ctypes.ResultConsensusState, error) {
+func (c *baseRPCClient) ConsensusState(ctx context.Context) (*ctypes.ResultConsensusState, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultConsensusState)
-	_, err := c.caller.Call(ctx, "consensus_state", map[string]interface{}{"chain_id": chainId}, result)
+	_, err := c.caller.Call(ctx, "consensus_state", map[string]interface{}{"chain_id": chainID}, result)
 	if err != nil {
 		return nil, err
 	}
@@ -352,12 +355,12 @@ func (c *baseRPCClient) ConsensusState(ctx context.Context, chainId string) (*ct
 
 func (c *baseRPCClient) ConsensusParams(
 	ctx context.Context,
-	chainId string,
 	height *int64,
 ) (*ctypes.ResultConsensusParams, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultConsensusParams)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	if height != nil {
 		params["height"] = height
 	}
@@ -379,13 +382,13 @@ func (c *baseRPCClient) Health(ctx context.Context) (*ctypes.ResultHealth, error
 
 func (c *baseRPCClient) BlockchainInfo(
 	ctx context.Context,
-	chainId string,
 	minHeight,
 	maxHeight int64,
 ) (*ctypes.ResultBlockchainInfo, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBlockchainInfo)
 	_, err := c.caller.Call(ctx, "blockchain",
-		map[string]interface{}{"chain_id": chainId, "minHeight": minHeight, "maxHeight": maxHeight},
+		map[string]interface{}{"chain_id": chainID, "minHeight": minHeight, "maxHeight": maxHeight},
 		result)
 	if err != nil {
 		return nil, err
@@ -393,28 +396,31 @@ func (c *baseRPCClient) BlockchainInfo(
 	return result, nil
 }
 
-func (c *baseRPCClient) Genesis(ctx context.Context, chainId string) (*ctypes.ResultGenesis, error) {
+func (c *baseRPCClient) Genesis(ctx context.Context) (*ctypes.ResultGenesis, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultGenesis)
-	_, err := c.caller.Call(ctx, "genesis", map[string]interface{}{"chain_id": chainId}, result)
+	_, err := c.caller.Call(ctx, "genesis", map[string]interface{}{"chain_id": chainID}, result)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (c *baseRPCClient) GenesisChunked(ctx context.Context, chainId string, id uint) (*ctypes.ResultGenesisChunk, error) {
+func (c *baseRPCClient) GenesisChunked(ctx context.Context, id uint) (*ctypes.ResultGenesisChunk, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultGenesisChunk)
-	_, err := c.caller.Call(ctx, "genesis_chunked", map[string]interface{}{"chain_id": chainId, "chunk": id}, result)
+	_, err := c.caller.Call(ctx, "genesis_chunked", map[string]interface{}{"chain_id": chainID, "chunk": id}, result)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (c *baseRPCClient) Block(ctx context.Context, chainId string, height *int64) (*ctypes.ResultBlock, error) {
+func (c *baseRPCClient) Block(ctx context.Context, height *int64) (*ctypes.ResultBlock, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBlock)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	if height != nil {
 		params["height"] = height
 	}
@@ -425,12 +431,13 @@ func (c *baseRPCClient) Block(ctx context.Context, chainId string, height *int64
 	return result, nil
 }
 
-func (c *baseRPCClient) BlockByHash(ctx context.Context, chainId string, hash []byte) (*ctypes.ResultBlock, error) {
+func (c *baseRPCClient) BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBlock, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBlock)
 	params := map[string]interface{}{
 		"hash": hash,
 	}
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	_, err := c.caller.Call(ctx, "block_by_hash", params, result)
 	if err != nil {
 		return nil, err
@@ -440,12 +447,12 @@ func (c *baseRPCClient) BlockByHash(ctx context.Context, chainId string, hash []
 
 func (c *baseRPCClient) BlockResults(
 	ctx context.Context,
-	chainId string,
 	height *int64,
 ) (*ctypes.ResultBlockResults, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBlockResults)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	if height != nil {
 		params["height"] = height
 	}
@@ -456,10 +463,11 @@ func (c *baseRPCClient) BlockResults(
 	return result, nil
 }
 
-func (c *baseRPCClient) Commit(ctx context.Context, chainId string, height *int64) (*ctypes.ResultCommit, error) {
+func (c *baseRPCClient) Commit(ctx context.Context, height *int64) (*ctypes.ResultCommit, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultCommit)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	if height != nil {
 		params["height"] = height
 	}
@@ -470,13 +478,14 @@ func (c *baseRPCClient) Commit(ctx context.Context, chainId string, height *int6
 	return result, nil
 }
 
-func (c *baseRPCClient) Tx(ctx context.Context, chainId string, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+func (c *baseRPCClient) Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultTx)
 	params := map[string]interface{}{
 		"hash":  hash,
 		"prove": prove,
 	}
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	_, err := c.caller.Call(ctx, "tx", params, result)
 	if err != nil {
 		return nil, err
@@ -486,7 +495,6 @@ func (c *baseRPCClient) Tx(ctx context.Context, chainId string, hash []byte, pro
 
 func (c *baseRPCClient) TxSearch(
 	ctx context.Context,
-	chainId string,
 	query string,
 	prove bool,
 	page,
@@ -494,13 +502,14 @@ func (c *baseRPCClient) TxSearch(
 	orderBy string,
 ) (*ctypes.ResultTxSearch, error) {
 
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultTxSearch)
 	params := map[string]interface{}{
 		"query":    query,
 		"prove":    prove,
 		"order_by": orderBy,
 	}
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 
 	if page != nil {
 		params["page"] = page
@@ -519,18 +528,18 @@ func (c *baseRPCClient) TxSearch(
 
 func (c *baseRPCClient) BlockSearch(
 	ctx context.Context,
-	chainId string,
 	query string,
 	page, perPage *int,
 	orderBy string,
 ) (*ctypes.ResultBlockSearch, error) {
 
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBlockSearch)
 	params := map[string]interface{}{
 		"query":    query,
 		"order_by": orderBy,
 	}
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 
 	if page != nil {
 		params["page"] = page
@@ -549,14 +558,14 @@ func (c *baseRPCClient) BlockSearch(
 
 func (c *baseRPCClient) Validators(
 	ctx context.Context,
-	chainId string,
 	height *int64,
 	page,
 	perPage *int,
 ) (*ctypes.ResultValidators, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultValidators)
 	params := make(map[string]interface{})
-	params["chain_id"] = chainId
+	params["chain_id"] = chainID
 	if page != nil {
 		params["page"] = page
 	}
@@ -575,11 +584,11 @@ func (c *baseRPCClient) Validators(
 
 func (c *baseRPCClient) BroadcastEvidence(
 	ctx context.Context,
-	chainId string,
 	ev types.Evidence,
 ) (*ctypes.ResultBroadcastEvidence, error) {
+	chainID := ctx.Value("chain_id").(string)
 	result := new(ctypes.ResultBroadcastEvidence)
-	_, err := c.caller.Call(ctx, "broadcast_evidence", map[string]interface{}{"chain_id": chainId, "evidence": ev}, result)
+	_, err := c.caller.Call(ctx, "broadcast_evidence", map[string]interface{}{"chain_id": chainID, "evidence": ev}, result)
 	if err != nil {
 		return nil, err
 	}

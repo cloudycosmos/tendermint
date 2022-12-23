@@ -51,8 +51,8 @@ type Client interface {
 type ABCIClient interface {
 	// Reading from abci app
 	ABCIInfo(context.Context) (*ctypes.ResultABCIInfo, error)
-	ABCIQuery(ctx context.Context, chainId string, path string, data bytes.HexBytes) (*ctypes.ResultABCIQuery, error)
-	ABCIQueryWithOptions(ctx context.Context, chainId string, path string, data bytes.HexBytes,
+	ABCIQuery(ctx context.Context, path string, data bytes.HexBytes) (*ctypes.ResultABCIQuery, error)
+	ABCIQueryWithOptions(ctx context.Context, path string, data bytes.HexBytes,
 		opts ABCIQueryOptions) (*ctypes.ResultABCIQuery, error)
 
 	// Writing to abci app
@@ -64,18 +64,17 @@ type ABCIClient interface {
 // SignClient groups together the functionality needed to get valid signatures
 // and prove anything about the chain.
 type SignClient interface {
-	Block(ctx context.Context, chainID string, height *int64) (*ctypes.ResultBlock, error)
-	BlockByHash(ctx context.Context, chainID string, hash []byte) (*ctypes.ResultBlock, error)
-	BlockResults(ctx context.Context, chainID string, height *int64) (*ctypes.ResultBlockResults, error)
-	Commit(ctx context.Context, chainId string, height *int64) (*ctypes.ResultCommit, error)
-	Validators(ctx context.Context, chainId string, height *int64, page, perPage *int) (*ctypes.ResultValidators, error)
-	Tx(ctx context.Context, chainId string, hash []byte, prove bool) (*ctypes.ResultTx, error)
+	Block(ctx context.Context, height *int64) (*ctypes.ResultBlock, error)
+	BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBlock, error)
+	BlockResults(ctx context.Context, height *int64) (*ctypes.ResultBlockResults, error)
+	Commit(ctx context.Context, height *int64) (*ctypes.ResultCommit, error)
+	Validators(ctx context.Context, height *int64, page, perPage *int) (*ctypes.ResultValidators, error)
+	Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.ResultTx, error)
 
 	// TxSearch defines a method to search for a paginated set of transactions by
 	// DeliverTx event search criteria.
 	TxSearch(
 		ctx context.Context,
-		chainId string,
 		query string,
 		prove bool,
 		page, perPage *int,
@@ -86,7 +85,6 @@ type SignClient interface {
 	// BeginBlock and EndBlock event search criteria.
 	BlockSearch(
 		ctx context.Context,
-		chainID string,
 		query string,
 		page, perPage *int,
 		orderBy string,
@@ -95,23 +93,23 @@ type SignClient interface {
 
 // HistoryClient provides access to data from genesis to now in large chunks.
 type HistoryClient interface {
-	Genesis(context.Context, string) (*ctypes.ResultGenesis, error)
-	GenesisChunked(context.Context, string, uint) (*ctypes.ResultGenesisChunk, error)
-	BlockchainInfo(ctx context.Context, chainID string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error)
+	Genesis(context.Context) (*ctypes.ResultGenesis, error)
+	GenesisChunked(context.Context, uint) (*ctypes.ResultGenesisChunk, error)
+	BlockchainInfo(ctx context.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error)
 }
 
 // StatusClient provides access to general chain info.
 type StatusClient interface {
-	Status(context.Context, string) (*ctypes.ResultStatus, error)
+	Status(context.Context) (*ctypes.ResultStatus, error)
 }
 
 // NetworkClient is general info about the network state. May not be needed
 // usually.
 type NetworkClient interface {
 	NetInfo(context.Context) (*ctypes.ResultNetInfo, error)
-	DumpConsensusState(context.Context, string) (*ctypes.ResultDumpConsensusState, error)
-	ConsensusState(context.Context, string) (*ctypes.ResultConsensusState, error)
-	ConsensusParams(ctx context.Context, chainId string, height *int64) (*ctypes.ResultConsensusParams, error)
+	DumpConsensusState(context.Context) (*ctypes.ResultDumpConsensusState, error)
+	ConsensusState(context.Context) (*ctypes.ResultConsensusState, error)
+	ConsensusParams(ctx context.Context, height *int64) (*ctypes.ResultConsensusParams, error)
 	Health(context.Context) (*ctypes.ResultHealth, error)
 }
 
@@ -134,15 +132,15 @@ type EventsClient interface {
 
 // MempoolClient shows us data about current mempool state.
 type MempoolClient interface {
-	UnconfirmedTxs(ctx context.Context, chainId string, limit *int) (*ctypes.ResultUnconfirmedTxs, error)
-	NumUnconfirmedTxs(context.Context, string) (*ctypes.ResultUnconfirmedTxs, error)
+	UnconfirmedTxs(ctx context.Context, limit *int) (*ctypes.ResultUnconfirmedTxs, error)
+	NumUnconfirmedTxs(context.Context) (*ctypes.ResultUnconfirmedTxs, error)
 	CheckTx(context.Context, types.Tx) (*ctypes.ResultCheckTx, error)
 }
 
 // EvidenceClient is used for submitting an evidence of the malicious
 // behaviour.
 type EvidenceClient interface {
-	BroadcastEvidence(context.Context, string, types.Evidence) (*ctypes.ResultBroadcastEvidence, error)
+	BroadcastEvidence(context.Context, types.Evidence) (*ctypes.ResultBroadcastEvidence, error)
 }
 
 // RemoteClient is a Client, which can also return the remote network address.

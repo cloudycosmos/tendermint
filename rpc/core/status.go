@@ -13,7 +13,8 @@ import (
 // Status returns Tendermint status including node info, pubkey, latest block
 // hash, app hash, block height and time.
 // More: https://docs.tendermint.com/master/rpc/#/Info/status
-func Status(ctx *rpctypes.Context, chainID string) (*ctypes.ResultStatus, error) {
+func Status(ctx *rpctypes.Context) (*ctypes.ResultStatus, error) {
+	chainID := ctx.GetChainID()
 	var (
 		earliestBlockHeight   int64
 		earliestBlockHash     tmbytes.HexBytes

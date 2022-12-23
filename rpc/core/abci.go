@@ -13,13 +13,13 @@ import (
 // More: https://docs.tendermint.com/master/rpc/#/ABCI/abci_query
 func ABCIQuery(
 	ctx *rpctypes.Context,
-	chainId string,
 	path string,
 	data bytes.HexBytes,
 	height int64,
 	prove bool,
 ) (*ctypes.ResultABCIQuery, error) {
-	proxyApp, found := env.ProxyAppMap[chainId]
+	chainID := ctx.GetChainID()
+	proxyApp, found := env.ProxyAppMap[chainID]
 	if !found {
 		return nil, errors.New("ABCIQuery failed to get proxyApp")
 	}
@@ -29,7 +29,7 @@ func ABCIQuery(
 		Data:   data,
 		Height: height,
 		Prove:  prove,
-		ChainID: chainId,
+		ChainID: chainID,
 	})
 	if err != nil {
 		return nil, err
@@ -40,8 +40,9 @@ func ABCIQuery(
 
 // ABCIInfo gets some info about the application.
 // More: https://docs.tendermint.com/master/rpc/#/ABCI/abci_info
-func ABCIInfo(ctx *rpctypes.Context, chainId string) (*ctypes.ResultABCIInfo, error) {
-	proxyApp, found := env.ProxyAppMap[chainId]
+func ABCIInfo(ctx *rpctypes.Context) (*ctypes.ResultABCIInfo, error) {
+	chainID := ctx.GetChainID()
+	proxyApp, found := env.ProxyAppMap[chainID]
 	if !found {
 		return nil, errors.New("ABCIInfo failed to get proxyApp")
 	}

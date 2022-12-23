@@ -177,7 +177,8 @@ func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadc
 // UnconfirmedTxs gets unconfirmed transactions (maximum ?limit entries)
 // including their number.
 // More: https://docs.tendermint.com/master/rpc/#/Info/unconfirmed_txs
-func UnconfirmedTxs(ctx *rpctypes.Context, chainID string, limitPtr *int) (*ctypes.ResultUnconfirmedTxs, error) {
+func UnconfirmedTxs(ctx *rpctypes.Context, limitPtr *int) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.GetChainID()
 	// reuse per_page validator
 	limit := validatePerPage(limitPtr)
 
@@ -191,7 +192,8 @@ func UnconfirmedTxs(ctx *rpctypes.Context, chainID string, limitPtr *int) (*ctyp
 
 // NumUnconfirmedTxs gets number of unconfirmed transactions.
 // More: https://docs.tendermint.com/master/rpc/#/Info/num_unconfirmed_txs
-func NumUnconfirmedTxs(ctx *rpctypes.Context, chainID string) (*ctypes.ResultUnconfirmedTxs, error) {
+func NumUnconfirmedTxs(ctx *rpctypes.Context) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.GetChainID()
 	return &ctypes.ResultUnconfirmedTxs{
 		Count:      env.MempoolMap[chainID].Size(),
 		Total:      env.MempoolMap[chainID].Size(),
@@ -201,7 +203,8 @@ func NumUnconfirmedTxs(ctx *rpctypes.Context, chainID string) (*ctypes.ResultUnc
 // CheckTx checks the transaction without executing it. The transaction won't
 // be added to the mempool either.
 // More: https://docs.tendermint.com/master/rpc/#/Tx/check_tx
-func CheckTx(ctx *rpctypes.Context, chainID string, tx types.Tx) (*ctypes.ResultCheckTx, error) {
+func CheckTx(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
+	chainID := ctx.GetChainID()
 	proxyApp, found := env.ProxyAppMap[chainID]
 	if !found {
 		return nil, errors.New("CheckTx failed to get proxyApp")

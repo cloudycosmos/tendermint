@@ -80,6 +80,8 @@ func makeJSONRPCHandler(funcMap map[string]*RPCFunc, logger log.Logger) http.Han
 				continue
 			}
 			ctx := &types.Context{JSONReq: &request, HTTPReq: r}
+			chainID := getChainIDFromParams(request.Params)
+			ctx.SetChainID(chainID)
 			args := []reflect.Value{reflect.ValueOf(ctx)}
 			if len(request.Params) > 0 {
 				fnArgs, err := jsonParamsToArgs(rpcFunc, request.Params)
@@ -239,3 +241,22 @@ func writeListOfEndpoints(w http.ResponseWriter, r *http.Request, funcMap map[st
 	w.WriteHeader(200)
 	w.Write(buf.Bytes()) // nolint: errcheck
 }
+
+func getChainIDFromParams(raw []byte) string {
+	var m1 map[string]json.RawMessage
+	err := json.Unmarshal(raw, &m1)
+	if err != nil {
+		return ""
+	}
+	if rawChainID, ok := m1["chain_id"]; ok {
+		var m2 string
+		err = json.Unmarshal(rawChainID, &m2)
+		if err != nil {
+			return ""
+		}
+		return string(m2)
+	} else {
+		return ""
+	}
+}
+

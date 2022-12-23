@@ -11,7 +11,8 @@ import (
 
 // BroadcastEvidence broadcasts evidence of the misbehavior.
 // More: https://docs.tendermint.com/master/rpc/#/Info/broadcast_evidence
-func BroadcastEvidence(ctx *rpctypes.Context, chainID string, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
+func BroadcastEvidence(ctx *rpctypes.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
+	chainID := ctx.GetChainID()
 	if ev == nil {
 		return nil, errors.New("no evidence was provided")
 	}

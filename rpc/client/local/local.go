@@ -66,7 +66,7 @@ func New(node *nm.Node) *Local {
 var _ rpcclient.Client = (*Local)(nil)
 
 // Added by Yi
-func (c *Local) SetChainID(chainID string) error {
+func (c *Local) YISetChainID(chainID string) error {
 	allChainIDs := c.Node.AllChainIDs()
 	for _, aChainID := range allChainIDs {
 		if chainID == aChainID {
@@ -83,25 +83,31 @@ func (c *Local) SetLogger(l log.Logger) {
 	c.Logger = l
 }
 
-func (c *Local) Status(ctx context.Context, chainID string) (*ctypes.ResultStatus, error) {
-	return core.Status(c.ctx, chainID)
+func (c *Local) Status(ctx context.Context) (*ctypes.ResultStatus, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Status(c.ctx)
 }
 
 func (c *Local) ABCIInfo(ctx context.Context) (*ctypes.ResultABCIInfo, error) {
-	return core.ABCIInfo(c.ctx, c.ChainID)
+	//c.ctx.SetChainID(chainID)
+	return core.ABCIInfo(c.ctx)
 }
 
-func (c *Local) ABCIQuery(ctx context.Context, chainId, path string, data bytes.HexBytes) (*ctypes.ResultABCIQuery, error) {
-	return c.ABCIQueryWithOptions(ctx, chainId, path, data, rpcclient.DefaultABCIQueryOptions)
+func (c *Local) ABCIQuery(ctx context.Context, path string, data bytes.HexBytes) (*ctypes.ResultABCIQuery, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return c.ABCIQueryWithOptions(ctx, path, data, rpcclient.DefaultABCIQueryOptions)
 }
 
 func (c *Local) ABCIQueryWithOptions(
 	ctx context.Context,
-	chainId string,
 	path string,
 	data bytes.HexBytes,
 	opts rpcclient.ABCIQueryOptions) (*ctypes.ResultABCIQuery, error) {
-	return core.ABCIQuery(c.ctx, chainId, path, data, opts.Height, opts.Prove)
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.ABCIQuery(c.ctx, path, data, opts.Height, opts.Prove)
 }
 
 func (c *Local) BroadcastTxCommit(ctx context.Context, tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
@@ -116,32 +122,42 @@ func (c *Local) BroadcastTxSync(ctx context.Context, tx types.Tx) (*ctypes.Resul
 	return core.BroadcastTxSync(c.ctx, tx)
 }
 
-func (c *Local) UnconfirmedTxs(ctx context.Context, chainID string, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
-	return core.UnconfirmedTxs(c.ctx, chainID, limit)
+func (c *Local) UnconfirmedTxs(ctx context.Context, limit *int) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.UnconfirmedTxs(c.ctx, limit)
 }
 
-func (c *Local) NumUnconfirmedTxs(ctx context.Context, chainID string) (*ctypes.ResultUnconfirmedTxs, error) {
-	return core.NumUnconfirmedTxs(c.ctx, chainID)
+func (c *Local) NumUnconfirmedTxs(ctx context.Context) (*ctypes.ResultUnconfirmedTxs, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.NumUnconfirmedTxs(c.ctx)
 }
 
 func (c *Local) CheckTx(ctx context.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
-	return core.CheckTx(c.ctx, c.ChainID, tx)
+	return core.CheckTx(c.ctx, tx)
 }
 
 func (c *Local) NetInfo(ctx context.Context) (*ctypes.ResultNetInfo, error) {
 	return core.NetInfo(c.ctx)
 }
 
-func (c *Local) DumpConsensusState(ctx context.Context, chainID string) (*ctypes.ResultDumpConsensusState, error) {
-	return core.DumpConsensusState(c.ctx, chainID)
+func (c *Local) DumpConsensusState(ctx context.Context) (*ctypes.ResultDumpConsensusState, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.DumpConsensusState(c.ctx)
 }
 
-func (c *Local) ConsensusState(ctx context.Context, chainID string) (*ctypes.ResultConsensusState, error) {
-	return core.ConsensusState(c.ctx, chainID)
+func (c *Local) ConsensusState(ctx context.Context) (*ctypes.ResultConsensusState, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.ConsensusState(c.ctx)
 }
 
-func (c *Local) ConsensusParams(ctx context.Context, chainID string, height *int64) (*ctypes.ResultConsensusParams, error) {
-	return core.ConsensusParams(c.ctx, chainID, height)
+func (c *Local) ConsensusParams(ctx context.Context, height *int64) (*ctypes.ResultConsensusParams, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.ConsensusParams(c.ctx, height)
 }
 
 func (c *Local) Health(ctx context.Context) (*ctypes.ResultHealth, error) {
@@ -162,66 +178,88 @@ func (c *Local) DialPeers(
 	return core.UnsafeDialPeers(c.ctx, peers, persistent, unconditional, private)
 }
 
-func (c *Local) BlockchainInfo(ctx context.Context, chainID string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
-	return core.BlockchainInfo(c.ctx, chainID, minHeight, maxHeight)
+func (c *Local) BlockchainInfo(ctx context.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.BlockchainInfo(c.ctx, minHeight, maxHeight)
 }
 
-func (c *Local) Genesis(ctx context.Context, chainID string) (*ctypes.ResultGenesis, error) {
-	return core.Genesis(c.ctx, chainID)
+func (c *Local) Genesis(ctx context.Context) (*ctypes.ResultGenesis, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Genesis(c.ctx)
 }
 
-func (c *Local) GenesisChunked(ctx context.Context, chainID string, id uint) (*ctypes.ResultGenesisChunk, error) {
-	return core.GenesisChunked(c.ctx, chainID, id)
+func (c *Local) GenesisChunked(ctx context.Context, id uint) (*ctypes.ResultGenesisChunk, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.GenesisChunked(c.ctx, id)
 }
 
-func (c *Local) Block(ctx context.Context, chainID string, height *int64) (*ctypes.ResultBlock, error) {
-	return core.Block(c.ctx, chainID, height)
+func (c *Local) Block(ctx context.Context, height *int64) (*ctypes.ResultBlock, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Block(c.ctx, height)
 }
 
-func (c *Local) BlockByHash(ctx context.Context, chainID string, hash []byte) (*ctypes.ResultBlock, error) {
-	return core.BlockByHash(c.ctx, chainID, hash)
+func (c *Local) BlockByHash(ctx context.Context, hash []byte) (*ctypes.ResultBlock, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.BlockByHash(c.ctx, hash)
 }
 
-func (c *Local) BlockResults(ctx context.Context, chainId string, height *int64) (*ctypes.ResultBlockResults, error) {
-	return core.BlockResults(c.ctx, chainId, height)
+func (c *Local) BlockResults(ctx context.Context, height *int64) (*ctypes.ResultBlockResults, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.BlockResults(c.ctx, height)
 }
 
-func (c *Local) Commit(ctx context.Context, chainID string, height *int64) (*ctypes.ResultCommit, error) {
-	return core.Commit(c.ctx, chainID, height)
+func (c *Local) Commit(ctx context.Context, height *int64) (*ctypes.ResultCommit, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Commit(c.ctx, height)
 }
 
-func (c *Local) Validators(ctx context.Context, chainID string, height *int64, page, perPage *int) (*ctypes.ResultValidators, error) {
-	return core.Validators(c.ctx, chainID, height, page, perPage)
+func (c *Local) Validators(ctx context.Context, height *int64, page, perPage *int) (*ctypes.ResultValidators, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Validators(c.ctx, height, page, perPage)
 }
 
-func (c *Local) Tx(ctx context.Context, chainID string, hash []byte, prove bool) (*ctypes.ResultTx, error) {
-	return core.Tx(c.ctx, chainID, hash, prove)
+func (c *Local) Tx(ctx context.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.Tx(c.ctx, hash, prove)
 }
 
 func (c *Local) TxSearch(
-	_ context.Context,
-	chainID string,
+	ctx context.Context,
 	query string,
 	prove bool,
 	page,
 	perPage *int,
 	orderBy string,
 ) (*ctypes.ResultTxSearch, error) {
-	return core.TxSearch(c.ctx, chainID, query, prove, page, perPage, orderBy)
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.TxSearch(c.ctx, query, prove, page, perPage, orderBy)
 }
 
 func (c *Local) BlockSearch(
-	_ context.Context,
-	chainId string,
+	ctx context.Context,
 	query string,
 	page, perPage *int,
 	orderBy string,
 ) (*ctypes.ResultBlockSearch, error) {
-	return core.BlockSearch(c.ctx, chainId, query, page, perPage, orderBy)
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.BlockSearch(c.ctx, query, page, perPage, orderBy)
 }
 
-func (c *Local) BroadcastEvidence(ctx context.Context, chainId string, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
-	return core.BroadcastEvidence(c.ctx, chainId, ev)
+func (c *Local) BroadcastEvidence(ctx context.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
+	chainID := ctx.Value("chain_id").(string)
+	c.ctx.SetChainID(chainID)
+	return core.BroadcastEvidence(c.ctx, ev)
 }
 
 func (c *Local) Subscribe(

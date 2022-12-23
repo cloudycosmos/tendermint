@@ -16,9 +16,11 @@ import (
 // BlockchainInfo gets block headers for minHeight <= height <= maxHeight.
 // Block headers are returned in descending order (highest first).
 // More: https://docs.tendermint.com/master/rpc/#/Info/blockchain
-func BlockchainInfo(ctx *rpctypes.Context, chainID string, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
+func BlockchainInfo(ctx *rpctypes.Context, minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
 	// maximum 20 block metas
 	const limit int64 = 20
+
+	chainID := ctx.GetChainID()
 	var err error
 	minHeight, maxHeight, err = filterMinMax(
 		env.BlockStoreMap[chainID].Base(),
@@ -78,7 +80,8 @@ func filterMinMax(base, height, min, max, limit int64) (int64, int64, error) {
 // Block gets block at a given height.
 // If no height is provided, it will fetch the latest block.
 // More: https://docs.tendermint.com/master/rpc/#/Info/block
-func Block(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*ctypes.ResultBlock, error) {
+func Block(ctx *rpctypes.Context, heightPtr *int64) (*ctypes.ResultBlock, error) {
+	chainID := ctx.GetChainID()
 	height, err := getHeight(chainID, env.BlockStoreMap[chainID].Height(), heightPtr)
 	if err != nil {
 		return nil, err
@@ -94,7 +97,8 @@ func Block(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*ctypes.Res
 
 // BlockByHash gets block by hash.
 // More: https://docs.tendermint.com/master/rpc/#/Info/block_by_hash
-func BlockByHash(ctx *rpctypes.Context, chainID string, hash []byte) (*ctypes.ResultBlock, error) {
+func BlockByHash(ctx *rpctypes.Context, hash []byte) (*ctypes.ResultBlock, error) {
+	chainID := ctx.GetChainID()
 	block := env.BlockStoreMap[chainID].LoadBlockByHash(hash)
 	if block == nil {
 		return &ctypes.ResultBlock{BlockID: types.BlockID{}, Block: nil}, nil
@@ -107,7 +111,8 @@ func BlockByHash(ctx *rpctypes.Context, chainID string, hash []byte) (*ctypes.Re
 // Commit gets block commit at a given height.
 // If no height is provided, it will fetch the commit for the latest block.
 // More: https://docs.tendermint.com/master/rpc/#/Info/commit
-func Commit(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*ctypes.ResultCommit, error) {
+func Commit(ctx *rpctypes.Context, heightPtr *int64) (*ctypes.ResultCommit, error) {
+	chainID := ctx.GetChainID()
 	height, err := getHeight(chainID, env.BlockStoreMap[chainID].Height(), heightPtr)
 	if err != nil {
 		return nil, err
@@ -138,7 +143,8 @@ func Commit(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*ctypes.Re
 // Thus response.results.deliver_tx[5] is the results of executing
 // getBlock(h).Txs[5]
 // More: https://docs.tendermint.com/master/rpc/#/Info/block_results
-func BlockResults(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*ctypes.ResultBlockResults, error) {
+func BlockResults(ctx *rpctypes.Context, heightPtr *int64) (*ctypes.ResultBlockResults, error) {
+	chainID := ctx.GetChainID()
 	height, err := getHeight(chainID, env.BlockStoreMap[chainID].Height(), heightPtr)
 	if err != nil {
 		return nil, err
@@ -163,12 +169,12 @@ func BlockResults(ctx *rpctypes.Context, chainID string, heightPtr *int64) (*cty
 // EndBlock event search criteria.
 func BlockSearch(
 	ctx *rpctypes.Context,
-	chainID string,
 	query string,
 	pagePtr, perPagePtr *int,
 	orderBy string,
 ) (*ctypes.ResultBlockSearch, error) {
 
+	chainID := ctx.GetChainID()
 	// skip if block indexing is disabled
 	if _, ok := env.BlockIndexerMap[chainID].(*blockidxnull.BlockerIndexer); ok {
 		return nil, errors.New("block indexing is disabled")

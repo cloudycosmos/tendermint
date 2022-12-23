@@ -103,7 +103,7 @@ func (p *http) LightBlock(ctx context.Context, height int64) (*types.LightBlock,
 
 // ReportEvidence calls `/broadcast_evidence` endpoint.
 func (p *http) ReportEvidence(ctx context.Context, chainId string, ev types.Evidence) error {
-	_, err := p.client.BroadcastEvidence(ctx, chainId, ev)
+	_, err := p.client.BroadcastEvidence(ctx, ev)
 	return err
 }
 
@@ -123,7 +123,7 @@ func (p *http) validatorSet(ctx context.Context, height *int64) (*types.Validato
 OUTER_LOOP:
 	for len(vals) != total && page <= maxPages {
 		for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
-			res, err := p.client.Validators(ctx, p.chainID, height, &page, &perPage)
+			res, err := p.client.Validators(ctx, height, &page, &perPage)
 			switch {
 			case err == nil:
 				// Validate response.
@@ -177,7 +177,7 @@ OUTER_LOOP:
 
 func (p *http) signedHeader(ctx context.Context, chainId string, height *int64) (*types.SignedHeader, error) {
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
-		commit, err := p.client.Commit(ctx, chainId, height)
+		commit, err := p.client.Commit(ctx, height)
 		switch {
 		case err == nil:
 			return &commit.SignedHeader, nil

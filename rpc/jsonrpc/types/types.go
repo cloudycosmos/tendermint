@@ -271,6 +271,17 @@ type Context struct {
 	WSConn WSRPCConnection
 	// http request
 	HTTPReq *http.Request
+
+	chainID string        // Added by Yi
+}
+
+// chainID getter
+func (ctx *Context) GetChainID() string {
+	return ctx.chainID
+}
+// chainID setter
+func (ctx *Context) SetChainID(chainID string) {
+	ctx.chainID = chainID
 }
 
 // RemoteAddr returns the remote address (usually a string "IP:port").
