@@ -277,7 +277,10 @@ type Context struct {
 
 // chainID getter
 func (ctx *Context) GetChainID() string {
-	return ctx.chainID
+	if len(ctx.chainID) > 0 {
+		return ctx.chainID
+	}
+	return "fake-chain-id-54321"
 }
 // chainID setter
 func (ctx *Context) SetChainID(chainID string) {
