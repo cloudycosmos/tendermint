@@ -364,6 +364,9 @@ func (wsc *wsConnection) readRoutine() {
 			}
 
 			ctx := &types.Context{JSONReq: &request, WSConn: wsc}
+			chainID := getChainIDFromParams(request.Params)
+			ctx.SetChainID(chainID)
+
 			args := []reflect.Value{reflect.ValueOf(ctx)}
 			if len(request.Params) > 0 {
 				fnArgs, err := jsonParamsToArgs(rpcFunc, request.Params)
